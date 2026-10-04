@@ -30,7 +30,7 @@ mod tests {
     use crate::lang::compile_source;
     use crate::lang::vm::StepResult;
     use crate::plugins::PluginMetadata;
-    use crate::robot::{PerformerMode, RobotField};
+    use crate::robot::RobotField;
     use crate::ui::keybindings::{KeybindingsConfig, Shortcut};
     use crate::ui::settings_dialog::AppSettings;
     use gtk::gdk;
@@ -107,26 +107,16 @@ mod tests {
         assert!(field.painted[0][1]);
     }
 
+
+
     #[test]
-    fn test_turtle_movement_and_pen() {
-        let mut field = RobotField::new(10, 10);
-        field.performer = PerformerMode::Turtle;
-        assert_eq!(field.turtle_angle, 0.0);
-        assert!(field.turtle_pen_down);
-        assert!(field.turtle_lines.is_empty());
-
-        field.turtle_forward(2.0);
-        assert_eq!(field.turtle_lines.len(), 1);
-        assert_eq!(field.robot_x, 2);
-
-        field.turtle_turn_right(90.0);
-        assert_eq!(field.turtle_angle, 270.0);
-
-        field.turtle_pen_up();
-        assert!(!field.turtle_pen_down);
-
-        field.turtle_forward(1.0);
-        assert_eq!(field.turtle_lines.len(), 1); // No new line when pen is up
+    fn test_turtle_plugin_discovery() {
+        use crate::plugins::PluginEngine;
+        let mut engine = PluginEngine::global().lock().unwrap();
+        engine.rescan_plugins();
+        let plugins = engine.list_plugins();
+        let found = plugins.iter().any(|p| p.id == "turtle");
+        assert!(found, "Turtle plugin must be discovered from plugins directory");
     }
 
     #[test]
@@ -181,24 +171,20 @@ mod tests {
     #[test]
     fn test_app_settings_persistence() {
         let default_settings = AppSettings::default();
-        assert_eq!(default_settings.performer, "robot");
         assert_eq!(default_settings.language, "ru");
         assert!(!default_settings.vim_mode);
 
         let json = serde_json::to_string(&default_settings).expect("Serialization must succeed");
         let loaded: AppSettings = serde_json::from_str(&json).expect("Deserialization must succeed");
-        assert_eq!(loaded.performer, "robot");
         assert_eq!(loaded.language, "ru");
         assert_eq!(loaded.theme, default_settings.theme);
         assert!(!loaded.vim_mode);
 
         let mut custom = default_settings.clone();
-        custom.performer = "turtle".to_string();
         custom.language = "en".to_string();
         custom.vim_mode = true;
         let json_custom = serde_json::to_string(&custom).unwrap();
         let loaded_custom: AppSettings = serde_json::from_str(&json_custom).unwrap();
-        assert_eq!(loaded_custom.performer, "turtle");
         assert_eq!(loaded_custom.language, "en");
         assert!(loaded_custom.vim_mode);
     }
@@ -229,8 +215,8 @@ mod tests {
         assert_eq!(ru.tr("run"), "Выполнить");
         assert_eq!(en.tr("settings_title"), "NeoMir Settings");
         assert_eq!(ru.tr("settings_title"), "Настройки NeoMir");
-        assert_eq!(en.tr("active_performer"), "Active Performer");
-        assert_eq!(ru.tr("active_performer"), "Активный исполнитель");
+        assert_eq!(en.tr("theme_title"), "Color Theme");
+        assert_eq!(ru.tr("theme_title"), "Тема оформления");
         assert!(en.is_en());
         assert!(!ru.is_en());
         assert_eq!(Language::from_code("en"), Language::En);

@@ -1,7 +1,5 @@
 use crate::plugins::PluginManager;
-use crate::robot::{PerformerMode, RobotField};
 use crate::ui::editor_view::EditorView;
-use crate::ui::field_view::RobotFieldView;
 use crate::ui::i18n::Language;
 use crate::ui::keybindings::{prompt_shortcut_recording, KeybindingsConfig};
 use crate::ui::theme::ThemeId;
@@ -17,10 +15,15 @@ fn default_syntax_str() -> String {
     "kumir".to_string()
 }
 
+fn default_performer() -> String {
+    "robot".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub theme: String,
     pub language: String,
+    #[serde(default = "default_performer")]
     pub performer: String,
     pub vim_mode: bool,
     #[serde(default = "default_syntax_str")]
@@ -78,9 +81,6 @@ impl SettingsDialog {
         editor_view: &Rc<EditorView>,
         keybindings: &Rc<RefCell<KeybindingsConfig>>,
         on_keybindings_changed: Rc<dyn Fn()>,
-        field: &Rc<RefCell<RobotField>>,
-        field_view: &Rc<RobotFieldView>,
-        on_performer_changed: Rc<dyn Fn()>,
         app_settings: &Rc<RefCell<AppSettings>>,
         on_language_changed: Rc<dyn Fn()>,
     ) {
@@ -89,9 +89,6 @@ impl SettingsDialog {
             editor_view,
             keybindings,
             on_keybindings_changed,
-            field,
-            field_view,
-            on_performer_changed,
             app_settings,
             on_language_changed,
             false,
@@ -103,9 +100,6 @@ impl SettingsDialog {
         editor_view: &Rc<EditorView>,
         keybindings: &Rc<RefCell<KeybindingsConfig>>,
         on_keybindings_changed: Rc<dyn Fn()>,
-        field: &Rc<RefCell<RobotField>>,
-        field_view: &Rc<RobotFieldView>,
-        on_performer_changed: Rc<dyn Fn()>,
         app_settings: &Rc<RefCell<AppSettings>>,
         on_language_changed: Rc<dyn Fn()>,
     ) {
@@ -114,9 +108,6 @@ impl SettingsDialog {
             editor_view,
             keybindings,
             on_keybindings_changed,
-            field,
-            field_view,
-            on_performer_changed,
             app_settings,
             on_language_changed,
             true,
@@ -128,9 +119,6 @@ impl SettingsDialog {
         editor_view: &Rc<EditorView>,
         keybindings: &Rc<RefCell<KeybindingsConfig>>,
         on_keybindings_changed: Rc<dyn Fn()>,
-        field: &Rc<RefCell<RobotField>>,
-        field_view: &Rc<RobotFieldView>,
-        on_performer_changed: Rc<dyn Fn()>,
         app_settings: &Rc<RefCell<AppSettings>>,
         on_language_changed: Rc<dyn Fn()>,
         open_extensions: bool,
@@ -144,13 +132,13 @@ impl SettingsDialog {
         let win_parent = parent.clone();
 
         // ==========================================
-        // Tab 1: General (Themes, Language, Performer, Editor, Vim)
+        // Вкладка 1: Основные параметры (Темы, Язык, Редактор, Vim)
         // ==========================================
         let page_general = adw::PreferencesPage::new();
         page_general.set_title(lang.tr("tab_general"));
         page_general.set_icon_name(Some("preferences-system-symbolic"));
 
-        // Group 1: Appearance & themes (Ptyxis themes)
+        // Группа 1: Оформление и темы редактора
         let theme_group = adw::PreferencesGroup::new();
         theme_group.set_title(lang.tr("grp_appearance"));
         theme_group.set_description(Some(lang.tr("desc_appearance")));
@@ -164,7 +152,7 @@ impl SettingsDialog {
         let string_list = gtk::StringList::new(&theme_names);
         theme_combo.set_model(Some(&string_list));
 
-        // Set active theme
+        // Установка активной темы оформления
         let current_theme = *editor_view.current_theme.borrow();
         if let Some(pos) = themes.iter().position(|t| *t == current_theme) {
             theme_combo.set_selected(pos as u32);
@@ -184,41 +172,43 @@ impl SettingsDialog {
         theme_group.add(&theme_combo);
         page_general.add(&theme_group);
 
-        // Group 2: Language & Localization
+        // Группа 2: Язык интерфейса и локализация
         let lang_group = adw::PreferencesGroup::new();
         lang_group.set_title(lang.tr("grp_language"));
         lang_group.set_description(Some(lang.tr("desc_language")));
 
         let lang_combo = adw::ComboRow::new();
         lang_combo.set_title(lang.tr("lang_title"));
-        let languages = ["Русский (Russian)", "English"];
-        let lang_list = gtk::StringList::new(&languages);
-        lang_combo.set_model(Some(&lang_list));
 
-        if app_settings.borrow().language == "en" {
-            lang_combo.set_selected(1);
-            lang_combo.set_subtitle(lang.tr("cur_lang_en"));
+        let current_code = app_settings.borrow().language.clone();
+        let is_current_en = current_code == "en";
+        if is_current_en {
+            lang_combo.set_subtitle("Current language: English");
         } else {
-            lang_combo.set_selected(0);
-            lang_combo.set_subtitle(lang.tr("cur_lang_ru"));
+            lang_combo.set_subtitle("Текущий язык: Русский");
         }
 
-        let parent_alert = parent.clone();
-        let lang_combo_clone = lang_combo.clone();
+        let lang_options = ["Русский", "English"];
+        let lang_list = gtk::StringList::new(&lang_options);
+        lang_combo.set_model(Some(&lang_list));
+        lang_combo.set_selected(if is_current_en { 1 } else { 0 });
+
         let s_lang = app_settings.clone();
         let on_lang_change_cb = on_language_changed.clone();
+        let parent_alert = parent.clone();
+        let lang_combo_clone = lang_combo.clone();
 
         lang_combo.connect_selected_notify(move |combo| {
             let idx = combo.selected();
-            let new_lang = if idx == 0 { Language::Ru } else { Language::En };
-            let lang_code = new_lang.code().to_string();
-
-            if s_lang.borrow().language == lang_code {
+            let new_code = if idx == 1 { "en" } else { "ru" };
+            if s_lang.borrow().language == new_code {
                 return;
             }
 
-            s_lang.borrow_mut().language = lang_code;
+            s_lang.borrow_mut().language = new_code.to_string();
             let _ = s_lang.borrow().save();
+
+            let new_lang = Language::from_code(new_code);
 
             if new_lang.is_en() {
                 lang_combo_clone.set_subtitle("Current language: English");
@@ -226,7 +216,7 @@ impl SettingsDialog {
                 lang_combo_clone.set_subtitle("Текущий язык: Русский");
             }
 
-            // Update main window UI components dynamically
+            // Динамическое обновление компонентов главного окна
             on_lang_change_cb();
 
             let alert = adw::AlertDialog::builder()
@@ -240,56 +230,7 @@ impl SettingsDialog {
         lang_group.add(&lang_combo);
         page_general.add(&lang_group);
 
-        // Group 3: Performer selection (Robot <-> Turtle)
-        let performer_group = adw::PreferencesGroup::new();
-        performer_group.set_title(lang.tr("grp_performer"));
-        performer_group.set_description(Some(lang.tr("desc_performer")));
-
-        let performer_combo = adw::ComboRow::new();
-        performer_combo.set_title(lang.tr("active_performer"));
-        let performer_options = [
-            lang.tr("perf_opt_robot"),
-            lang.tr("perf_opt_turtle"),
-        ];
-        let performer_list = gtk::StringList::new(&performer_options);
-        performer_combo.set_model(Some(&performer_list));
-
-        let cur_performer = field.borrow().performer;
-        if cur_performer == PerformerMode::Turtle {
-            performer_combo.set_selected(1);
-            performer_combo.set_subtitle(lang.tr("cur_perf_turtle"));
-        } else {
-            performer_combo.set_selected(0);
-            performer_combo.set_subtitle(lang.tr("cur_perf_robot"));
-        }
-
-        let f_perf = field.clone();
-        let fv_perf = field_view.clone();
-        let on_change = on_performer_changed.clone();
-        let perf_combo_clone = performer_combo.clone();
-        let s_perf = app_settings.clone();
-        let cur_lang_for_perf = lang;
-
-        performer_combo.connect_selected_notify(move |combo| {
-            let idx = combo.selected();
-            if idx == 1 {
-                f_perf.borrow_mut().performer = PerformerMode::Turtle;
-                perf_combo_clone.set_subtitle(cur_lang_for_perf.tr("cur_perf_turtle"));
-                s_perf.borrow_mut().performer = "turtle".to_string();
-            } else {
-                f_perf.borrow_mut().performer = PerformerMode::Robot;
-                perf_combo_clone.set_subtitle(cur_lang_for_perf.tr("cur_perf_robot"));
-                s_perf.borrow_mut().performer = "robot".to_string();
-            }
-            let _ = s_perf.borrow().save();
-            fv_perf.widget.queue_draw();
-            on_change();
-        });
-
-        performer_group.add(&performer_combo);
-        page_general.add(&performer_group);
-
-        // Group 4: Editor & Vim mode
+        // Группа 3: Редактор и режим Vim
         let editor_group = adw::PreferencesGroup::new();
         editor_group.set_title(lang.tr("grp_editor"));
         editor_group.set_description(Some(lang.tr("desc_editor")));
@@ -353,7 +294,7 @@ impl SettingsDialog {
         dialog.add(&page_general);
 
         // ==========================================
-        // Tab 2: Keyboard shortcuts
+        // Вкладка 2: Горячие клавиши
         // ==========================================
         let page_shortcuts = adw::PreferencesPage::new();
         page_shortcuts.set_title(lang.tr("tab_shortcuts"));
@@ -368,7 +309,7 @@ impl SettingsDialog {
         let win_sc = parent.clone();
         let is_en = lang.is_en();
 
-        // 1. Run (F5)
+        // 1. Запуск выполнения программы (F5)
         let row_run = adw::ActionRow::new();
         row_run.set_title(lang.tr("sc_run"));
         let btn_run = gtk::Button::with_label(&kb_cfg.borrow().run.to_display_string());
@@ -396,7 +337,7 @@ impl SettingsDialog {
         row_run.add_suffix(&btn_run);
         shortcuts_group.add(&row_run);
 
-        // 2. Step (F10)
+        // 2. Пошаговое выполнение (F10)
         let row_step = adw::ActionRow::new();
         row_step.set_title(lang.tr("sc_step"));
         let btn_step = gtk::Button::with_label(&kb_cfg.borrow().step.to_display_string());
@@ -424,7 +365,7 @@ impl SettingsDialog {
         row_step.add_suffix(&btn_step);
         shortcuts_group.add(&row_step);
 
-        // 3. Reset (F8)
+        // 3. Сброс состояния исполнителя (F8)
         let row_reset = adw::ActionRow::new();
         row_reset.set_title(lang.tr("sc_reset"));
         let btn_reset = gtk::Button::with_label(&kb_cfg.borrow().reset.to_display_string());
@@ -452,7 +393,7 @@ impl SettingsDialog {
         row_reset.add_suffix(&btn_reset);
         shortcuts_group.add(&row_reset);
 
-        // 4. Save (Ctrl+S)
+        // 4. Сохранение файла (Ctrl+S)
         let row_save = adw::ActionRow::new();
         row_save.set_title(lang.tr("sc_save"));
         let btn_save = gtk::Button::with_label(&kb_cfg.borrow().save.to_display_string());
@@ -480,7 +421,7 @@ impl SettingsDialog {
         row_save.add_suffix(&btn_save);
         shortcuts_group.add(&row_save);
 
-        // Reset to defaults
+        // Сброс горячих клавиш к значениям по умолчанию
         let btn_defaults = gtk::Button::with_label(lang.tr("btn_defaults"));
         btn_defaults.add_css_class("destructive-action");
         btn_defaults.set_halign(gtk::Align::Center);
@@ -510,7 +451,7 @@ impl SettingsDialog {
         dialog.add(&page_shortcuts);
 
         // ==========================================
-        // Tab 3: Extensions / Plugins (.plug support)
+        // Вкладка 3: Расширения и плагины (пакеты .plug)
         // ==========================================
         let page_plugins = adw::PreferencesPage::new();
         page_plugins.set_title(lang.tr("tab_extensions"));
@@ -535,7 +476,7 @@ impl SettingsDialog {
         let list_group = adw::PreferencesGroup::new();
         list_group.set_title(lang.tr("grp_installed_ext"));
 
-        // Helper to refresh plugin list
+        // Вспомогательная функция обновления списка установленных плагинов
         let plugins_state = Rc::new(RefCell::new(Vec::new()));
         let list_group_rc = Rc::new(list_group.clone());
         let plug_lang = lang;
@@ -594,6 +535,27 @@ impl SettingsDialog {
 
                     row.add_suffix(&sw);
 
+                    if meta.entry.is_some() {
+                        let btn_launch = gtk::Button::from_icon_name("media-playback-start-symbolic");
+                        btn_launch.add_css_class("flat");
+                        btn_launch.set_valign(gtk::Align::Center);
+                        let launch_tip = if plug_lang.is_en() { "Launch extension" } else { "Запустить расширение" };
+                        btn_launch.set_tooltip_text(Some(launch_tip));
+                        let launch_id = meta.id.clone();
+                        let win_alert = win.clone();
+                        btn_launch.connect_clicked(move |_| {
+                            if let Err(e) = PluginManager::launch_plugin(&launch_id) {
+                                let alert = adw::AlertDialog::builder()
+                                    .heading(plug_lang.tr("error"))
+                                    .body(&format!("{}: {}", plug_lang.tr("ext_status_fail"), e))
+                                    .build();
+                                alert.add_response("ok", "OK");
+                                alert.choose(&win_alert, Option::<&gio::Cancellable>::None, |_| {});
+                            }
+                        });
+                        row.add_suffix(&btn_launch);
+                    }
+
                     let btn_del = gtk::Button::from_icon_name("user-trash-symbolic");
                     btn_del.add_css_class("flat");
                     btn_del.add_css_class("destructive-action");
@@ -637,7 +599,7 @@ impl SettingsDialog {
 
         refresh_list();
 
-        // Connect .plug chooser
+        // Подключение диалога выбора файла пакета .plug
         {
             let win = parent.clone();
             let rf = refresh_list.clone();

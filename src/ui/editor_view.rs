@@ -342,11 +342,8 @@ impl EditorView {
         ];
 
         let robot_cmds = [
-            "вверх", "вниз", "влево", "вправо", "закрасить", "робот", "сброс",
-            "up", "down", "left", "right", "paint", "robot", "reset",
-            "forward", "backward", "turn_left", "turn_right", "turtle",
-            "вперед", "назад", "налево", "направо", "черепаха",
-            "pen_down", "pen_up", "tail_down", "tail_up", "step_back",
+            "вверх", "вниз", "влево", "вправо", "закрасить", "робот", "сброс", "шаг_назад",
+            "up", "down", "left", "right", "paint", "robot", "reset", "step_back",
         ];
 
         let sensors = [

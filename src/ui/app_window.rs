@@ -1,6 +1,7 @@
 use crate::lang::{compile_source, vm::StepResult, vm::VirtualMachine};
 use crate::plugins::ipc::IpcServer;
-use crate::robot::{PerformerMode, RobotField};
+use crate::plugins::PluginEngine;
+use crate::robot::RobotField;
 use crate::ui::console_view::ConsoleView;
 use crate::ui::editor_view::{EditorView, SyntaxMode};
 use crate::ui::field_view::RobotFieldView;
@@ -48,13 +49,7 @@ impl AppWindow {
         let is_running = Rc::new(RefCell::new(false));
         let keybindings = Rc::new(RefCell::new(KeybindingsConfig::load()));
 
-        // Apply saved performer
-        let initial_performer = if app_settings.borrow().performer == "turtle" {
-            PerformerMode::Turtle
-        } else {
-            PerformerMode::Robot
-        };
-        field.borrow_mut().performer = initial_performer;
+
 
         // Apply saved theme
         let saved_theme = app_settings.borrow().theme.clone();
@@ -70,12 +65,7 @@ impl AppWindow {
         editor_view.set_syntax_mode(initial_syntax);
 
         // Status Label & IPC Server
-        let initial_status_text = if initial_performer == PerformerMode::Turtle {
-            current_lang.tr("status_active_turtle")
-        } else {
-            current_lang.tr("status_ready")
-        };
-        let status_label = gtk::Label::new(Some(initial_status_text));
+        let status_label = gtk::Label::new(Some(current_lang.tr("status_ready")));
         status_label.add_css_class("dim-label");
 
         IpcServer::start(
@@ -205,11 +195,12 @@ impl AppWindow {
         btn_menu.set_popover(Some(&menu_popover));
 
         // Title widget
-        let initial_subtitle = if initial_performer == PerformerMode::Turtle {
-            let tail = if field.borrow().turtle_pen_down { current_lang.tr("tail_down") } else { current_lang.tr("tail_up") };
-            format!("Performer: Turtle | Angle: {}° | Tail: {}", field.borrow().turtle_angle.round() as i32, tail)
-        } else {
-            format!("Performer: Robot | Field: {}×{}", field.borrow().width, field.borrow().height)
+        let initial_subtitle = {
+            let f = field.borrow();
+            let template = current_lang.tr("title_robot");
+            template
+                .replacen("{}", &f.width.to_string(), 1)
+                .replacen("{}", &f.height.to_string(), 1)
         };
         let title_widget = adw::WindowTitle::new("NeoMir", &initial_subtitle);
 
@@ -249,28 +240,15 @@ impl AppWindow {
             let f = field.clone();
             let fv = field_view.clone();
             let tw = title_widget.clone();
-            let stat = status_label.clone();
             let lr = lang_ref.clone();
             Rc::new(move || {
                 let f_borrow = f.borrow();
                 let lang = *lr.borrow();
-                if f_borrow.performer == PerformerMode::Turtle {
-                    let tail = if f_borrow.turtle_pen_down { lang.tr("tail_down") } else { lang.tr("tail_up") };
-                    let angle = f_borrow.turtle_angle.round() as i32;
-                    let template = lang.tr("title_turtle");
-                    let sub = template
-                        .replacen("{}", &angle.to_string(), 1)
-                        .replacen("{}", tail, 1);
-                    tw.set_subtitle(&sub);
-                    stat.set_text(lang.tr("status_active_turtle"));
-                } else {
-                    let template = lang.tr("title_robot");
-                    let sub = template
-                        .replacen("{}", &f_borrow.width.to_string(), 1)
-                        .replacen("{}", &f_borrow.height.to_string(), 1);
-                    tw.set_subtitle(&sub);
-                    stat.set_text(lang.tr("status_active_robot"));
-                }
+                let template = lang.tr("title_robot");
+                let sub = template
+                    .replacen("{}", &f_borrow.width.to_string(), 1)
+                    .replacen("{}", &f_borrow.height.to_string(), 1);
+                tw.set_subtitle(&sub);
                 fv.widget.queue_draw();
             })
         };
@@ -371,7 +349,6 @@ impl AppWindow {
             Rc::new(move || {
                 let lang = *lr_clone.borrow();
                 let mut f = f_clone.borrow_mut();
-                let was_turtle = f.performer == PerformerMode::Turtle;
                 let ok = f.step_back();
                 let (rx, ry) = (f.robot_x + 1, f.robot_y + 1);
                 let (sx, sy) = (f.start_x + 1, f.start_y + 1);
@@ -380,7 +357,7 @@ impl AppWindow {
                 sync_clone();
 
                 if ok {
-                    let template = if was_turtle { lang.tr("status_turtle_backed") } else { lang.tr("status_robot_backed") };
+                    let template = lang.tr("status_robot_backed");
                     let msg = template.replacen("{}", &rx.to_string(), 1).replacen("{}", &ry.to_string(), 1);
                     con_clone.log_action(&msg);
                     stat_clone.set_text(&msg);
@@ -611,9 +588,6 @@ impl AppWindow {
             let ev = editor_view.clone();
             let kb = keybindings.clone();
             let ut = update_tooltips.clone();
-            let fld = field.clone();
-            let fv = field_view.clone();
-            let sync = sync_performer_ui.clone();
             let st = app_settings.clone();
             let pop = menu_popover.clone();
             let lr = lang_ref.clone();
@@ -628,7 +602,7 @@ impl AppWindow {
                     *lr_inner.borrow_mut() = Language::from_code(&st_inner.borrow().language);
                     upd_inner();
                 });
-                SettingsDialog::show(&win, &ev, &kb, ut.clone(), &fld, &fv, sync.clone(), &st, on_lang_changed);
+                SettingsDialog::show(&win, &ev, &kb, ut.clone(), &st, on_lang_changed);
             });
         }
         {
@@ -636,9 +610,6 @@ impl AppWindow {
             let ev = editor_view.clone();
             let kb = keybindings.clone();
             let ut = update_tooltips.clone();
-            let fld = field.clone();
-            let fv = field_view.clone();
-            let sync = sync_performer_ui.clone();
             let st = app_settings.clone();
             let pop = menu_popover.clone();
             let lr = lang_ref.clone();
@@ -653,7 +624,7 @@ impl AppWindow {
                     *lr_inner.borrow_mut() = Language::from_code(&st_inner.borrow().language);
                     upd_inner();
                 });
-                SettingsDialog::show_extensions(&win, &ev, &kb, ut.clone(), &fld, &fv, sync.clone(), &st, on_lang_changed);
+                SettingsDialog::show_extensions(&win, &ev, &kb, ut.clone(), &st, on_lang_changed);
             });
         }
         {
@@ -855,11 +826,12 @@ impl AppWindow {
 
                     let (sender, receiver) = std::sync::mpsc::channel();
                     let full_script = format!(r#"
-import socket, json, sys
+import socket, json, sys, os
 
 client_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 try:
-    client_sock.connect("/tmp/neomir.sock")
+    sock_p = os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/neomir.sock"
+    client_sock.connect(sock_p)
 except Exception:
     client_sock = None
 
@@ -879,15 +851,7 @@ paint = закрасить = lambda: _send("paint")
 step_back = назад_робот = lambda: _send("step_back")
 reset = сброс = lambda: _send("reset")
 
-# Turtle commands
-forward = вперед = lambda d=1: _send({{"cmd": "turtle_forward", "dist": float(d)}})
-backward = назад = lambda d=1: _send({{"cmd": "turtle_backward", "dist": float(d)}})
-turn_left = налево = lambda a=90: _send({{"cmd": "turtle_turn_left", "angle": float(a)}})
-turn_right = направо = lambda a=90: _send({{"cmd": "turtle_turn_right", "angle": float(a)}})
-pen_down = tail_down = опустить_хвост = опустить_перо = lambda: _send("turtle_pen_down")
-pen_up = tail_up = поднять_хвост = поднять_перо = lambda: _send("turtle_pen_up")
-turtle = черепаха = lambda: _send({{"cmd": "set_performer", "performer": "turtle"}})
-robot = робот = lambda: _send({{"cmd": "set_performer", "performer": "robot"}})
+
 
 {}
 "#, py_code);
@@ -1062,6 +1026,13 @@ robot = робот = lambda: _send({{"cmd": "set_performer", "performer": "robot
             });
         }
         window.add_controller(key_controller);
+
+        PluginEngine::global().lock().unwrap().load_auto_start_plugins();
+
+        window.connect_close_request(|_| {
+            PluginEngine::global().lock().unwrap().stop_all();
+            glib::Propagation::Proceed
+        });
 
         Self { window }
     }

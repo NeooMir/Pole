@@ -1,4 +1,4 @@
-use crate::robot::{PerformerMode, RobotField};
+use crate::robot::RobotField;
 use gtk::cairo::Context;
 use gtk::prelude::*;
 use std::cell::RefCell;
@@ -23,9 +23,9 @@ impl RobotFieldView {
             Self::draw_field(&f, cr, width as f64, height as f64);
         });
 
-        // Click gesture for editing field
+        // Жест нажатия мыши для интерактивного редактирования поля
         let click_gesture = gtk::GestureClick::new();
-        click_gesture.set_button(0); // accept all buttons
+        click_gesture.set_button(0); // обрабатывать все кнопки мыши
         let field_click = field.clone();
         let da_weak = drawing_area.downgrade();
 
@@ -59,34 +59,30 @@ impl RobotFieldView {
                 return;
             }
 
-            let in_cell_x = rel_x - (col as f64 * cell_size);
-            let in_cell_y = rel_y - (row as f64 * cell_size);
-            let wall_threshold = (cell_size * 0.22).clamp(6.0, 14.0);
+            match button {
+                1 => {
+                    // Левый клик: переключение закраски клетки или установка стены у границы
+                    let fx = (rel_x / cell_size).fract();
+                    let fy = (rel_y / cell_size).fract();
+                    let threshold = 0.22;
 
-            // Right click: Move robot start position
-            if button == 3 {
-                f.set_start_pos(col, row);
-                da.queue_draw();
-                return;
-            }
-
-            // Left click
-            let near_right = in_cell_x >= cell_size - wall_threshold;
-            let near_left = in_cell_x <= wall_threshold;
-            let near_bottom = in_cell_y >= cell_size - wall_threshold;
-            let near_top = in_cell_y <= wall_threshold;
-
-            if near_right && col + 1 < f.width {
-                f.toggle_v_wall(row, col);
-            } else if near_left && col > 0 {
-                f.toggle_v_wall(row, col - 1);
-            } else if near_bottom && row + 1 < f.height {
-                f.toggle_h_wall(row, col);
-            } else if near_top && row > 0 {
-                f.toggle_h_wall(row - 1, col);
-            } else {
-                // Click in center of cell: toggle paint
-                f.toggle_paint_cell(col, row);
+                    if fy < threshold && row > 0 {
+                        f.toggle_h_wall(row - 1, col);
+                    } else if fy > (1.0 - threshold) && row + 1 < f.height {
+                        f.toggle_h_wall(row, col);
+                    } else if fx < threshold && col > 0 {
+                        f.toggle_v_wall(row, col - 1);
+                    } else if fx > (1.0 - threshold) && col + 1 < f.width {
+                        f.toggle_v_wall(row, col);
+                    } else {
+                        f.toggle_paint_cell(col, row);
+                    }
+                }
+                3 => {
+                    // Правый клик: перемещение начальной позиции Робота
+                    f.set_start_pos(col, row);
+                }
+                _ => {}
             }
 
             da.queue_draw();
@@ -101,53 +97,45 @@ impl RobotFieldView {
     }
 
     fn compute_layout(field: &RobotField, width: f64, height: f64) -> (f64, f64, f64) {
-        let padding = 16.0;
-        let avail_w = (width - padding * 2.0).max(10.0);
-        let avail_h = (height - padding * 2.0).max(10.0);
+        let margin = 20.0;
+        let available_w = (width - margin * 2.0).max(10.0);
+        let available_h = (height - margin * 2.0).max(10.0);
 
-        let cell_w = avail_w / field.width as f64;
-        let cell_h = avail_h / field.height as f64;
-        let cell_size = cell_w.min(cell_h).clamp(16.0, 75.0);
+        let cell_w = available_w / field.width as f64;
+        let cell_h = available_h / field.height as f64;
+        let cell_size = cell_w.min(cell_h).clamp(24.0, 72.0);
 
         let grid_w = cell_size * field.width as f64;
         let grid_h = cell_size * field.height as f64;
-        let offset_x = (width - grid_w) / 2.0;
-        let offset_y = (height - grid_h) / 2.0;
+
+        let offset_x = ((width - grid_w) / 2.0).max(margin);
+        let offset_y = ((height - grid_h) / 2.0).max(margin);
 
         (cell_size, offset_x, offset_y)
     }
 
-    pub fn draw_field(field: &RobotField, cr: &Context, width: f64, height: f64) {
-        // Background fill
-        cr.set_source_rgb(0.96, 0.96, 0.97);
-        cr.paint().unwrap();
+    fn draw_field(field: &RobotField, cr: &Context, width: f64, height: f64) {
+        // Заливка фона поля
+        cr.set_source_rgb(0.97, 0.98, 0.99);
+        cr.rectangle(0.0, 0.0, width, height);
+        let _ = cr.fill();
 
         let (cell_size, offset_x, offset_y) = Self::compute_layout(field, width, height);
 
-        // Draw painted cells
+        // Отрисовка закрашенных клеток
+        cr.set_source_rgb(0.72, 0.78, 0.85); // Классический серо-голубой цвет закраски КуМир
         for r in 0..field.height {
             for c in 0..field.width {
                 if field.painted[r][c] {
                     let x = offset_x + c as f64 * cell_size;
                     let y = offset_y + r as f64 * cell_size;
-                    cr.set_source_rgb(0.82, 0.88, 0.95);
-                    cr.rectangle(x, y, cell_size, cell_size);
+                    cr.rectangle(x + 1.0, y + 1.0, cell_size - 2.0, cell_size - 2.0);
                     let _ = cr.fill();
-
-                    // Pattern dots inside painted cell
-                    cr.set_source_rgb(0.68, 0.76, 0.88);
-                    let step = cell_size / 4.0;
-                    for i in 1..4 {
-                        for j in 1..4 {
-                            cr.arc(x + i as f64 * step, y + j as f64 * step, 1.2, 0.0, std::f64::consts::TAU);
-                            let _ = cr.fill();
-                        }
-                    }
                 }
             }
         }
 
-        // Draw grid lines
+        // Отрисовка линий координатной сетки
         cr.set_source_rgb(0.78, 0.80, 0.84);
         cr.set_line_width(1.0);
 
@@ -165,7 +153,7 @@ impl RobotFieldView {
             let _ = cr.stroke();
         }
 
-        // Draw trace of visited cells (Robot or Turtle)
+        // Отрисовка траектории пройденного следа
         if field.trace.len() > 1 {
             cr.set_source_rgba(0.2, 0.5, 0.9, 0.35);
             for &(tx, ty) in &field.trace {
@@ -176,25 +164,7 @@ impl RobotFieldView {
             }
         }
 
-        // Draw Turtle vector lines if any
-        if !field.turtle_lines.is_empty() {
-            cr.set_source_rgba(0.18, 0.76, 0.49, 0.95); // Emerald green trace
-            cr.set_line_width(3.5);
-            cr.set_line_cap(gtk::cairo::LineCap::Round);
-            cr.set_line_join(gtk::cairo::LineJoin::Round);
-
-            for &((x1, y1), (x2, y2)) in &field.turtle_lines {
-                let sx1 = offset_x + x1 * cell_size;
-                let sy1 = offset_y + y1 * cell_size;
-                let sx2 = offset_x + x2 * cell_size;
-                let sy2 = offset_y + y2 * cell_size;
-                cr.move_to(sx1, sy1);
-                cr.line_to(sx2, sy2);
-                let _ = cr.stroke();
-            }
-        }
-
-        // Draw internal horizontal walls
+        // Отрисовка внутренних горизонтальных стен
         cr.set_source_rgb(0.15, 0.18, 0.22);
         cr.set_line_width(4.5);
         cr.set_line_cap(gtk::cairo::LineCap::Round);
@@ -212,7 +182,7 @@ impl RobotFieldView {
             }
         }
 
-        // Draw internal vertical walls
+        // Отрисовка внутренних вертикальных стен
         for r in 0..field.height {
             for c in 0..field.v_walls[0].len() {
                 if field.v_walls[r][c] {
@@ -226,7 +196,7 @@ impl RobotFieldView {
             }
         }
 
-        // Draw outer boundary walls (Thick KuMir boundary)
+        // Отрисовка внешних границ поля (толстая рамка КуМир)
         cr.set_source_rgb(0.12, 0.14, 0.18);
         cr.set_line_width(5.0);
         let grid_w = cell_size * field.width as f64;
@@ -234,119 +204,61 @@ impl RobotFieldView {
         cr.rectangle(offset_x, offset_y, grid_w, grid_h);
         let _ = cr.stroke();
 
-        // Coordinates for current performer
+        // Вычисление экранных координат Робота
         let rx = offset_x + field.robot_x as f64 * cell_size + cell_size * 0.5;
         let ry = offset_y + field.robot_y as f64 * cell_size + cell_size * 0.5;
         let radius = cell_size * 0.36;
 
-        if field.performer == PerformerMode::Turtle {
-            // ==========================================
-            // Render Turtle Performer (Черепаха)
-            // ==========================================
-            let rad = field.turtle_angle.to_radians();
+        // Отрисовка исполнителя Робот
+        if field.crashed {
+            // Аварийное состояние (красный предупреждающий крест)
+            cr.set_source_rgb(0.9, 0.2, 0.2);
+            cr.arc(rx, ry, radius, 0.0, std::f64::consts::TAU);
+            let _ = cr.fill();
 
-            // Shell shadow
+            cr.set_source_rgb(1.0, 1.0, 1.0);
+            cr.set_line_width(3.0);
+            let d = radius * 0.55;
+            cr.move_to(rx - d, ry - d);
+            cr.line_to(rx + d, ry + d);
+            cr.move_to(rx + d, ry - d);
+            cr.line_to(rx - d, ry + d);
+            let _ = cr.stroke();
+        } else {
+            // Исполнитель Робот: классический ромб с глазом
+            // Тень Робота
             cr.set_source_rgba(0.0, 0.0, 0.0, 0.18);
             cr.arc(rx, ry + 2.0, radius * 0.9, 0.0, std::f64::consts::TAU);
             let _ = cr.fill();
 
-            // 4 Flippers (Lappies)
-            cr.set_source_rgb(0.18, 0.62, 0.38);
-            for flipper_angle in [rad + 0.7, rad - 0.7, rad + 2.4, rad - 2.4] {
-                let fx = rx + (radius * 0.85) * flipper_angle.cos();
-                let fy = ry - (radius * 0.85) * flipper_angle.sin();
-                cr.arc(fx, fy, radius * 0.30, 0.0, std::f64::consts::TAU);
-                let _ = cr.fill();
-            }
-
-            // Turtle Shell (Green dome)
-            cr.set_source_rgb(0.15, 0.68, 0.37);
-            cr.arc(rx, ry, radius * 0.80, 0.0, std::f64::consts::TAU);
+            // Корпус (ромб)
+            cr.set_source_rgb(0.18, 0.45, 0.85); // Классический синий цвет КуМир
+            cr.move_to(rx, ry - radius);
+            cr.line_to(rx + radius, ry);
+            cr.line_to(rx, ry + radius);
+            cr.line_to(rx - radius, ry);
+            cr.close_path();
             let _ = cr.fill();
 
-            // Shell rim
-            cr.set_source_rgb(0.10, 0.48, 0.26);
+            // Обводка корпуса
+            cr.set_source_rgb(0.08, 0.25, 0.55);
             cr.set_line_width(2.0);
-            cr.arc(rx, ry, radius * 0.80, 0.0, std::f64::consts::TAU);
+            cr.move_to(rx, ry - radius);
+            cr.line_to(rx + radius, ry);
+            cr.line_to(rx, ry + radius);
+            cr.line_to(rx - radius, ry);
+            cr.close_path();
             let _ = cr.stroke();
 
-            // Turtle Head pointing in direction of movement
-            let head_x = rx + (radius * 0.95) * rad.cos();
-            let head_y = ry - (radius * 0.95) * rad.sin();
-            cr.set_source_rgb(0.20, 0.75, 0.42);
-            cr.arc(head_x, head_y, radius * 0.38, 0.0, std::f64::consts::TAU);
+            // Глаз Робота
+            cr.set_source_rgb(1.0, 1.0, 1.0);
+            cr.arc(rx, ry, radius * 0.38, 0.0, std::f64::consts::TAU);
             let _ = cr.fill();
 
-            cr.set_source_rgb(0.10, 0.48, 0.26);
-            cr.set_line_width(1.5);
-            cr.arc(head_x, head_y, radius * 0.38, 0.0, std::f64::consts::TAU);
-            let _ = cr.stroke();
-
-            // Pen indicator in center of shell
-            if field.turtle_pen_down {
-                cr.set_source_rgb(0.9, 0.2, 0.2); // Red pen down dot
-                cr.arc(rx, ry, radius * 0.22, 0.0, std::f64::consts::TAU);
-                let _ = cr.fill();
-            } else {
-                cr.set_source_rgb(0.7, 0.7, 0.7); // Gray pen up ring
-                cr.set_line_width(1.8);
-                cr.arc(rx, ry, radius * 0.22, 0.0, std::f64::consts::TAU);
-                let _ = cr.stroke();
-            }
-        } else {
-            // ==========================================
-            // Render Robot Performer (Робот)
-            // ==========================================
-            if field.crashed {
-                // Crashed Robot representation (red warning marker)
-                cr.set_source_rgb(0.9, 0.2, 0.2);
-                cr.arc(rx, ry, radius, 0.0, std::f64::consts::TAU);
-                let _ = cr.fill();
-
-                cr.set_source_rgb(1.0, 1.0, 1.0);
-                cr.set_line_width(3.0);
-                let d = radius * 0.55;
-                cr.move_to(rx - d, ry - d);
-                cr.line_to(rx + d, ry + d);
-                cr.move_to(rx + d, ry - d);
-                cr.line_to(rx - d, ry + d);
-                let _ = cr.stroke();
-            } else {
-                // KuMir Robot: Diamond with inner eye & robot antenna
-                // Shadow
-                cr.set_source_rgba(0.0, 0.0, 0.0, 0.18);
-                cr.arc(rx, ry + 2.0, radius * 0.9, 0.0, std::f64::consts::TAU);
-                let _ = cr.fill();
-
-                // Diamond body
-                cr.set_source_rgb(0.18, 0.45, 0.85); // Classic deep KuMir blue
-                cr.move_to(rx, ry - radius);
-                cr.line_to(rx + radius, ry);
-                cr.line_to(rx, ry + radius);
-                cr.line_to(rx - radius, ry);
-                cr.close_path();
-                let _ = cr.fill();
-
-                // Diamond border
-                cr.set_source_rgb(0.08, 0.25, 0.55);
-                cr.set_line_width(2.0);
-                cr.move_to(rx, ry - radius);
-                cr.line_to(rx + radius, ry);
-                cr.line_to(rx, ry + radius);
-                cr.line_to(rx - radius, ry);
-                cr.close_path();
-                let _ = cr.stroke();
-
-                // Inner eye/circle
-                cr.set_source_rgb(1.0, 1.0, 1.0);
-                cr.arc(rx, ry, radius * 0.38, 0.0, std::f64::consts::TAU);
-                let _ = cr.fill();
-
-                // Pupil
-                cr.set_source_rgb(0.15, 0.2, 0.3);
-                cr.arc(rx, ry, radius * 0.18, 0.0, std::f64::consts::TAU);
-                let _ = cr.fill();
-            }
+            // Зрачок
+            cr.set_source_rgb(0.15, 0.2, 0.3);
+            cr.arc(rx, ry, radius * 0.18, 0.0, std::f64::consts::TAU);
+            let _ = cr.fill();
         }
     }
 }

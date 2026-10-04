@@ -35,7 +35,50 @@ impl PluginEngine {
         path
     }
 
+    fn sync_bundled_plugins(&self) {
+        let user_dir = Self::plugins_dir();
+        let mut bundled_candidates = vec![
+            PathBuf::from("plugins"),
+            PathBuf::from("/app/share/neomir/plugins"),
+            PathBuf::from("/usr/share/neomir/plugins"),
+        ];
+
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(parent) = exe.parent() {
+                bundled_candidates.push(parent.join("plugins"));
+                bundled_candidates.push(parent.join("../share/neomir/plugins"));
+            }
+        }
+
+        for cand in &bundled_candidates {
+            if cand.exists() && cand.is_dir() {
+                if let Ok(entries) = fs::read_dir(cand) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.is_dir() && path.join("plugin.json").exists() {
+                            let plugin_id = entry.file_name();
+                            let target = user_dir.join(&plugin_id);
+                            if !target.exists() {
+                                let _ = copy_dir_recursive(&path, &target);
+                            } else if let Ok(file_entries) = fs::read_dir(&path) {
+                                for file in file_entries.flatten() {
+                                    let fname = file.file_name();
+                                    if fname != "plugin.json" {
+                                        let src_f = path.join(&fname);
+                                        let dst_f = target.join(&fname);
+                                        let _ = fs::copy(&src_f, &dst_f);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub fn rescan_plugins(&mut self) {
+        self.sync_bundled_plugins();
         let dir = Self::plugins_dir();
         let mut new_map = HashMap::new();
 
@@ -47,7 +90,7 @@ impl PluginEngine {
                     if manifest.exists() {
                         if let Ok(content) = fs::read_to_string(&manifest) {
                             if let Some(meta) = PluginMetadata::from_json(&content) {
-                                // Preserve running process if already loaded
+                                // Сохраняем запущенный процесс, если плагин уже был загружен
                                 let proc = self.plugins.remove(&meta.id).and_then(|lp| lp.process);
                                 new_map.insert(
                                     meta.id.clone(),
@@ -81,7 +124,7 @@ impl PluginEngine {
         let _ = fs::remove_dir_all(&temp_dir);
         fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
 
-        // Extract tar.gz package
+        // Распаковываем установочный архив tar.gz (.plug)
         let status = Command::new("tar")
             .arg("-xzf")
             .arg(file_path)
@@ -92,7 +135,7 @@ impl PluginEngine {
         let manifest_path = temp_dir.join("plugin.json");
 
         if status.is_err() || !status.unwrap().success() || !manifest_path.exists() {
-            // Check if file is raw json
+            // Проверяем, является ли переданный файл одиночным манифестом plugin.json
             if let Ok(content) = fs::read_to_string(file_path) {
                 if let Some(meta) = PluginMetadata::from_json(&content) {
                     let target_dir = Self::plugins_dir().join(&meta.id);
@@ -117,7 +160,7 @@ impl PluginEngine {
             return Err("Идентификатор плагина (id) не может быть пустым".to_string());
         }
 
-        // Copy files recursively to target_dir
+        // Рекурсивно копируем файлы плагина в целевую директорию
         let target_dir = Self::plugins_dir().join(&meta.id);
         let _ = fs::remove_dir_all(&target_dir);
         fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
@@ -145,6 +188,11 @@ impl PluginEngine {
             }
 
             self.rescan_plugins();
+
+            if enabled {
+                let _ = self.launch_plugin(id);
+            }
+
             Ok(())
         } else {
             Err("Ошибка чтения манифеста плагина".to_string())
@@ -175,10 +223,10 @@ impl PluginEngine {
             return Err(format!("Файл точки входа не найден: {}", script_path.display()));
         }
 
-        // If already running, do not spawn another instance
+        // Если процесс плагина уже активен, не создаем повторный экземпляр
         if let Some(ref mut child) = plugin.process {
             if let Ok(None) = child.try_wait() {
-                return Ok(()); // Already running
+                return Ok(()); // Уже запущен
             }
         }
 

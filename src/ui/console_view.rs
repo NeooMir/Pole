@@ -161,15 +161,15 @@ impl ConsoleView {
 
         let mut init_iter = py_buffer.end_iter();
         if initial_lang.is_en() {
-            py_buffer.insert(&mut init_iter, "NeoMir Python 3 REPL (connected to Robot and Turtle)\n");
-            py_buffer.insert(&mut init_iter, "Robot commands: up(), down(), left(), right(), paint(), reset()\n");
-            py_buffer.insert(&mut init_iter, "Turtle commands: forward(n), backward(n), turn_left(deg), turn_right(deg), pen_down(), pen_up()\n");
-            py_buffer.insert(&mut init_iter, "Switch performer: robot(), turtle()\n>>> ");
+            py_buffer.insert(&mut init_iter, "NeoMir Python 3 REPL (connected to Robot)
+");
+            py_buffer.insert(&mut init_iter, "Robot commands: up(), down(), left(), right(), paint(), reset()
+>>> ");
         } else {
-            py_buffer.insert(&mut init_iter, "NeoMir Python 3 REPL (подключен к Роботу и Черепахе)\n");
-            py_buffer.insert(&mut init_iter, "Команды Робота: вверх(), вниз(), влево(), вправо(), закрасить(), сброс()\n");
-            py_buffer.insert(&mut init_iter, "Команды Черепахи: вперед(n), назад(n), налево(град), направо(град), опустить_хвост(), поднять_хвост()\n");
-            py_buffer.insert(&mut init_iter, "Смена исполнителя: робот(), черепаха()\n>>> ");
+            py_buffer.insert(&mut init_iter, "NeoMir Python 3 REPL (подключен к Роботу)
+");
+            py_buffer.insert(&mut init_iter, "Команды Робота: вверх(), вниз(), влево(), вправо(), закрасить(), сброс()
+>>> ");
         }
 
         let py_scroll = gtk::ScrolledWindow::builder()
@@ -188,9 +188,9 @@ impl ConsoleView {
         let py_entry = gtk::Entry::new();
         py_entry.set_hexpand(true);
         let initial_placeholder = if initial_lang.is_en() {
-            "Enter Python code (e.g. forward(3); paint(); turtle(); robot())..."
+            "Enter Python code (e.g. up(); paint(); down())..."
         } else {
-            "Введите код Python (например: вперед(3); закрасить(); черепаха(); робот())..."
+            "Введите код Python (например: вверх(); закрасить(); вниз())..."
         };
         py_entry.set_placeholder_text(Some(initial_placeholder));
 
@@ -253,21 +253,7 @@ def _send(payload):
 закрасить = paint = lambda: _send("paint")
 сброс = reset = lambda: _send("reset")
 
-# Turtle commands (Russian & English)
-вперед = forward = lambda d=1: _send({{"cmd": "turtle_forward", "dist": float(d)}})
-назад = backward = lambda d=1: _send({{"cmd": "turtle_backward", "dist": float(d)}})
-налево = turn_left = lambda a=90: _send({{"cmd": "turtle_turn_left", "angle": float(a)}})
-направо = turn_right = lambda a=90: _send({{"cmd": "turtle_turn_right", "angle": float(a)}})
-опустить_хвост = pen_down = lambda: _send("turtle_pen_down")
-поднять_хвост = pen_up = lambda: _send("turtle_pen_up")
-опустить_перо = pen_down
-поднять_перо = pen_up
-tail_down = pen_down
-tail_up = pen_up
 
-# Performer switcher
-черепаха = turtle = lambda: _send({{"cmd": "set_performer", "performer": "turtle"}})
-робот = robot = lambda: _send({{"cmd": "set_performer", "performer": "robot"}})
 
 code_input = {}
 try:
@@ -379,7 +365,7 @@ except SyntaxError:
             self.lbl_tab_py.set_text("Python Console");
             self.btn_terminal.set_tooltip_text(Some("Launch Python in system terminal"));
             self.btn_clear.set_tooltip_text(Some("Clear console"));
-            self.py_entry.set_placeholder_text(Some("Enter Python code (e.g. forward(3); paint(); turtle(); robot())..."));
+            self.py_entry.set_placeholder_text(Some("Enter Python code (e.g. up(); paint(); down())..."));
             self.py_btn_run.set_label("Run");
         } else {
             self.header_title.set_text("Вывод и Журнал");
@@ -388,7 +374,7 @@ except SyntaxError:
             self.lbl_tab_py.set_text("Консоль Python");
             self.btn_terminal.set_tooltip_text(Some("Запустить Python в системном терминале"));
             self.btn_clear.set_tooltip_text(Some("Очистить консоль"));
-            self.py_entry.set_placeholder_text(Some("Введите код Python (например: вперед(3); закрасить(); черепаха(); робот())..."));
+            self.py_entry.set_placeholder_text(Some("Введите код Python (например: вверх(); закрасить(); вниз())..."));
             self.py_btn_run.set_label("Выполнить");
         }
     }

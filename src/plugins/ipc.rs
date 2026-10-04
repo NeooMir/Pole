@@ -1,4 +1,4 @@
-use crate::robot::{Direction, PerformerMode, RobotField};
+use crate::robot::{Direction, RobotField};
 use crate::ui::console_view::ConsoleView;
 use crate::ui::field_view::RobotFieldView;
 use gtk::glib;
@@ -48,7 +48,7 @@ impl IpcServer {
         let (ipc_tx, ipc_rx) = mpsc::channel::<IpcRequest>();
         let ipc_rx = Arc::new(Mutex::new(ipc_rx));
 
-        // Main thread polling via GLib timeout (15ms ~ 60 FPS)
+        // Опрос очереди команд в главном GUI-потоке через таймер GLib (15 мс ~ 60 кадров/с)
         let rx_for_main = ipc_rx.clone();
         let f = field.clone();
         let fv = field_view.clone();
@@ -65,7 +65,7 @@ impl IpcServer {
             glib::ControlFlow::Continue
         });
 
-        // Background worker thread for socket handling
+        // Фоновый поток для прослушивания входящих подключений сокета
         thread::spawn(move || {
             for stream in listener.incoming() {
                 match stream {
@@ -98,51 +98,63 @@ impl IpcServer {
             }
 
             let (tx, rx) = mpsc::channel();
-            let req = IpcRequest {
-                command: trimmed,
-                response_tx: tx,
-            };
+            if ipc_tx
+                .send(IpcRequest {
+                    command: trimmed,
+                    response_tx: tx,
+                })
+                .is_err()
+            {
+                break;
+            }
 
-            if ipc_tx.send(req).is_ok() {
-                if let Ok(resp) = rx.recv() {
-                    let _ = writer.write_all(resp.as_bytes());
-                    let _ = writer.write_all(b"\n");
-                    let _ = writer.flush();
-                }
+            if let Ok(resp) = rx.recv_timeout(Duration::from_millis(2000)) {
+                let _ = writeln!(writer, "{}", resp);
+                let _ = writer.flush();
+            } else {
+                let _ = writeln!(writer, "{{\"status\":\"error\",\"message\":\"timeout\"}}");
+                let _ = writer.flush();
             }
         }
     }
 
     fn handle_command(
-        cmd: &str,
+        raw_cmd: &str,
         field: &Rc<RefCell<RobotField>>,
         field_view: &Rc<RobotFieldView>,
         console: &Rc<ConsoleView>,
         status: &gtk::Label,
     ) -> String {
-        let action = if cmd.contains("\"cmd\":") {
-            extract_cmd_val(cmd, "cmd").unwrap_or_else(|| cmd.to_string())
+        let cmd = raw_cmd.trim();
+
+        // Извлечение имени команды из JSON или строки текста
+        let cmd_name = if cmd.starts_with('{') {
+            extract_cmd_val(cmd, "cmd")
+                .or_else(|| extract_cmd_val(cmd, "command"))
+                .unwrap_or_else(|| "unknown".to_string())
         } else {
-            cmd.trim_matches('"').to_string()
+            cmd.to_string()
         };
 
-        match action.as_str() {
-            // Robot Movement
+        match cmd_name.as_str() {
+            // ==========================================
+            // Перемещение и действия Робота
+            // ==========================================
             "move_up" | "up" | "вверх" => {
                 let mut f = field.borrow_mut();
                 match f.move_robot(&Direction::Up) {
                     Ok(_) => {
                         field_view.widget.queue_draw();
-                        let msg = format!("Python: Робот переместился вверх ({}, {})", f.robot_x + 1, f.robot_y + 1);
+                        let msg = format!("Робот: шаг вверх ({}, {})", f.robot_x + 1, f.robot_y + 1);
                         console.log_action(&msg);
                         status.set_text(&msg);
                         format_state(&f, "ok", None)
                     }
                     Err(err) => {
                         field_view.widget.queue_draw();
-                        console.print_error(&format!("Python IPC ошибка: {}", err));
+                        console.log_action(&err);
                         status.set_text(&err);
-                        format_state(&f, "error", Some(&err))
+                        format_state(&f, "crash", Some(&err))
                     }
                 }
             }
@@ -151,16 +163,16 @@ impl IpcServer {
                 match f.move_robot(&Direction::Down) {
                     Ok(_) => {
                         field_view.widget.queue_draw();
-                        let msg = format!("Python: Робот переместился вниз ({}, {})", f.robot_x + 1, f.robot_y + 1);
+                        let msg = format!("Робот: шаг вниз ({}, {})", f.robot_x + 1, f.robot_y + 1);
                         console.log_action(&msg);
                         status.set_text(&msg);
                         format_state(&f, "ok", None)
                     }
                     Err(err) => {
                         field_view.widget.queue_draw();
-                        console.print_error(&format!("Python IPC ошибка: {}", err));
+                        console.log_action(&err);
                         status.set_text(&err);
-                        format_state(&f, "error", Some(&err))
+                        format_state(&f, "crash", Some(&err))
                     }
                 }
             }
@@ -169,16 +181,16 @@ impl IpcServer {
                 match f.move_robot(&Direction::Left) {
                     Ok(_) => {
                         field_view.widget.queue_draw();
-                        let msg = format!("Python: Робот переместился влево ({}, {})", f.robot_x + 1, f.robot_y + 1);
+                        let msg = format!("Робот: шаг влево ({}, {})", f.robot_x + 1, f.robot_y + 1);
                         console.log_action(&msg);
                         status.set_text(&msg);
                         format_state(&f, "ok", None)
                     }
                     Err(err) => {
                         field_view.widget.queue_draw();
-                        console.print_error(&format!("Python IPC ошибка: {}", err));
+                        console.log_action(&err);
                         status.set_text(&err);
-                        format_state(&f, "error", Some(&err))
+                        format_state(&f, "crash", Some(&err))
                     }
                 }
             }
@@ -187,16 +199,16 @@ impl IpcServer {
                 match f.move_robot(&Direction::Right) {
                     Ok(_) => {
                         field_view.widget.queue_draw();
-                        let msg = format!("Python: Робот переместился вправо ({}, {})", f.robot_x + 1, f.robot_y + 1);
+                        let msg = format!("Робот: шаг вправо ({}, {})", f.robot_x + 1, f.robot_y + 1);
                         console.log_action(&msg);
                         status.set_text(&msg);
                         format_state(&f, "ok", None)
                     }
                     Err(err) => {
                         field_view.widget.queue_draw();
-                        console.print_error(&format!("Python IPC ошибка: {}", err));
+                        console.log_action(&err);
                         status.set_text(&err);
-                        format_state(&f, "error", Some(&err))
+                        format_state(&f, "crash", Some(&err))
                     }
                 }
             }
@@ -204,7 +216,7 @@ impl IpcServer {
                 let mut f = field.borrow_mut();
                 f.paint_cell();
                 field_view.widget.queue_draw();
-                let msg = format!("Python: Клетка ({}, {}) закрашена", f.robot_x + 1, f.robot_y + 1);
+                let msg = format!("Робот: клетка ({}, {}) закрашена", f.robot_x + 1, f.robot_y + 1);
                 console.log_action(&msg);
                 status.set_text(&msg);
                 format_state(&f, "ok", None)
@@ -213,32 +225,37 @@ impl IpcServer {
                 let mut f = field.borrow_mut();
                 f.reset_execution();
                 field_view.widget.queue_draw();
-                console.print_info("Python: Поле сброшено в исходное положение");
-                status.set_text("Исполнитель возвращен в исходное положение.");
+                console.log_action("Робот: сброшен в начальное положение");
+                status.set_text("Робот сброшен");
                 format_state(&f, "ok", None)
             }
             "step_back" | "return_back" | "шаг_назад" | "возврат" => {
                 let mut f = field.borrow_mut();
-                let stepped = f.step_back();
+                let ok = f.step_back();
                 field_view.widget.queue_draw();
-                if stepped {
-                    let msg = format!("Python: Робот возвращён назад на позицию ({}, {})", f.robot_x + 1, f.robot_y + 1);
+                if ok {
+                    let msg = format!("Робот возвращен назад на позицию ({}, {})", f.robot_x + 1, f.robot_y + 1);
                     console.log_action(&msg);
                     status.set_text(&msg);
+                    format_state(&f, "ok", None)
                 } else {
-                    let msg = format!("Python: Робот уже на стартовой позиции ({}, {})", f.robot_x + 1, f.robot_y + 1);
+                    let msg = "Робот уже в начальной точке".to_string();
                     console.log_action(&msg);
                     status.set_text(&msg);
+                    format_state(&f, "ok", Some(&msg))
                 }
-                format_state(&f, "ok", None)
             }
+
+            // ==========================================
+            // Запрос состояния и датчиков
+            // ==========================================
             "get_state" | "status" => {
                 let f = field.borrow();
                 format_state(&f, "ok", None)
             }
 
             // ==========================================
-            // Console Interaction
+            // Взаимодействие с консолью
             // ==========================================
             "set_console_input" | "console_set_input" => {
                 let text = extract_cmd_val(cmd, "text").unwrap_or_default();
@@ -268,103 +285,6 @@ impl IpcServer {
                 "{\"status\":\"ok\"}".to_string()
             }
 
-            // ==========================================
-            // Performer Switcher (Робот ↔ Черепаха)
-            // ==========================================
-            "get_performer" => {
-                let f = field.borrow();
-                let p = match f.performer {
-                    PerformerMode::Robot => "robot",
-                    PerformerMode::Turtle => "turtle",
-                };
-                format!("{{\"status\":\"ok\",\"performer\":\"{}\"}}", p)
-            }
-            "set_performer" => {
-                let perf_arg = extract_cmd_val(cmd, "performer").unwrap_or_default().to_lowercase();
-                let mut f = field.borrow_mut();
-                if perf_arg == "turtle" || perf_arg == "черепаха" {
-                    f.performer = PerformerMode::Turtle;
-                    status.set_text("Активен Исполнитель: Черепаха");
-                } else {
-                    f.performer = PerformerMode::Robot;
-                    status.set_text("Активен Исполнитель: Робот");
-                }
-                field_view.widget.queue_draw();
-                let p = match f.performer {
-                    PerformerMode::Robot => "robot",
-                    PerformerMode::Turtle => "turtle",
-                };
-                format!("{{\"status\":\"ok\",\"performer\":\"{}\"}}", p)
-            }
-
-            // ==========================================
-            // Turtle Performer Commands
-            // ==========================================
-            "turtle_forward" | "вперед" => {
-                let dist = extract_cmd_f64(cmd, "dist").unwrap_or(1.0);
-                let mut f = field.borrow_mut();
-                f.performer = PerformerMode::Turtle;
-                f.turtle_forward(dist);
-                field_view.widget.queue_draw();
-                let msg = format!("Черепаха: шаг вперед на {}", dist);
-                console.log_action(&msg);
-                status.set_text(&msg);
-                format_state(&f, "ok", None)
-            }
-            "turtle_backward" | "назад" => {
-                let dist = extract_cmd_f64(cmd, "dist").unwrap_or(1.0);
-                let mut f = field.borrow_mut();
-                f.performer = PerformerMode::Turtle;
-                f.turtle_backward(dist);
-                field_view.widget.queue_draw();
-                let msg = format!("Черепаха: шаг назад на {}", dist);
-                console.log_action(&msg);
-                status.set_text(&msg);
-                format_state(&f, "ok", None)
-            }
-            "turtle_turn_left" | "влево_угол" => {
-                let angle = extract_cmd_f64(cmd, "angle").unwrap_or(90.0);
-                let mut f = field.borrow_mut();
-                f.performer = PerformerMode::Turtle;
-                f.turtle_turn_left(angle);
-                field_view.widget.queue_draw();
-                let msg = format!("Черепаха: поворот влево на {}°", angle);
-                console.log_action(&msg);
-                status.set_text(&msg);
-                format_state(&f, "ok", None)
-            }
-            "turtle_turn_right" | "вправо_угол" => {
-                let angle = extract_cmd_f64(cmd, "angle").unwrap_or(90.0);
-                let mut f = field.borrow_mut();
-                f.performer = PerformerMode::Turtle;
-                f.turtle_turn_right(angle);
-                field_view.widget.queue_draw();
-                let msg = format!("Черепаха: поворот вправо на {}°", angle);
-                console.log_action(&msg);
-                status.set_text(&msg);
-                format_state(&f, "ok", None)
-            }
-            "turtle_pen_down" | "опустить_хвост" => {
-                let mut f = field.borrow_mut();
-                f.performer = PerformerMode::Turtle;
-                f.turtle_pen_down();
-                field_view.widget.queue_draw();
-                let msg = "Черепаха: хвост опущен (рисование включено)";
-                console.log_action(msg);
-                status.set_text(msg);
-                format_state(&f, "ok", None)
-            }
-            "turtle_pen_up" | "поднять_хвост" => {
-                let mut f = field.borrow_mut();
-                f.performer = PerformerMode::Turtle;
-                f.turtle_pen_up();
-                field_view.widget.queue_draw();
-                let msg = "Черепаха: хвост поднят (рисование отключено)";
-                console.log_action(msg);
-                status.set_text(msg);
-                format_state(&f, "ok", None)
-            }
-
             other => {
                 format!("{{\"status\":\"error\",\"message\":\"Неизвестная команда: {}\"}}", other)
             }
@@ -387,19 +307,6 @@ fn extract_cmd_val(json: &str, field: &str) -> Option<String> {
     Some(after_colon[1..1 + end_quote].to_string())
 }
 
-fn extract_cmd_f64(json: &str, field: &str) -> Option<f64> {
-    let key = format!("\"{}\"", field);
-    let key_pos = json.find(&key)?;
-    let after_key = &json[key_pos + key.len()..];
-    let colon_pos = after_key.find(':')?;
-    let after_colon = after_key[colon_pos + 1..].trim_start();
-    let num_str: String = after_colon
-        .chars()
-        .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
-        .collect();
-    num_str.parse::<f64>().ok()
-}
-
 fn format_state(f: &RobotField, status: &str, err_msg: Option<&str>) -> String {
     let error_part = if let Some(m) = err_msg {
         format!(",\"message\":\"{}\"", m.replace('"', "\\\""))
@@ -407,19 +314,11 @@ fn format_state(f: &RobotField, status: &str, err_msg: Option<&str>) -> String {
         "".to_string()
     };
 
-    let perf_str = match f.performer {
-        PerformerMode::Robot => "robot",
-        PerformerMode::Turtle => "turtle",
-    };
-
     format!(
-        "{{\"status\":\"{}\",\"performer\":\"{}\",\"x\":{},\"y\":{},\"turtle_angle\":{},\"pen_down\":{},\"is_painted\":{},\"crashed\":{},\"wall_up\":{},\"wall_down\":{},\"wall_left\":{},\"wall_right\":{}{}}}",
+        "{{\"status\":\"{}\",\"x\":{},\"y\":{},\"is_painted\":{},\"crashed\":{},\"wall_up\":{},\"wall_down\":{},\"wall_left\":{},\"wall_right\":{}{}}}",
         status,
-        perf_str,
         f.robot_x + 1,
         f.robot_y + 1,
-        f.turtle_angle,
-        f.turtle_pen_down,
         f.is_painted(),
         f.crashed,
         f.has_wall(&Direction::Up),

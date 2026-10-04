@@ -6,12 +6,6 @@ pub enum Direction {
     Right,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PerformerMode {
-    Robot,
-    Turtle,
-}
-
 #[derive(Debug, Clone)]
 pub struct RobotField {
     pub width: usize,
@@ -27,10 +21,6 @@ pub struct RobotField {
     pub trace: Vec<(usize, usize)>,
     pub crashed: bool,
     pub crash_message: Option<String>,
-    pub performer: PerformerMode,
-    pub turtle_angle: f64,
-    pub turtle_pen_down: bool,
-    pub turtle_lines: Vec<((f64, f64), (f64, f64))>,
 }
 
 impl RobotField {
@@ -56,17 +46,11 @@ impl RobotField {
             trace: vec![(0, 0)],
             crashed: false,
             crash_message: None,
-            performer: PerformerMode::Robot,
-            turtle_angle: 0.0,
-            turtle_pen_down: true,
-            turtle_lines: Vec::new(),
         }
     }
 
     pub fn resize(&mut self, width: usize, height: usize) {
-        let performer = self.performer;
         *self = Self::new(width, height);
-        self.performer = performer;
     }
 
     pub fn reset_execution(&mut self) {
@@ -76,9 +60,6 @@ impl RobotField {
         self.trace = vec![(self.robot_x, self.robot_y)];
         self.crashed = false;
         self.crash_message = None;
-        self.turtle_angle = 0.0;
-        self.turtle_pen_down = true;
-        self.turtle_lines.clear();
     }
 
     pub fn step_back(&mut self) -> bool {
@@ -89,9 +70,6 @@ impl RobotField {
             self.robot_y = py;
             self.crashed = false;
             self.crash_message = None;
-            if self.performer == PerformerMode::Turtle && !self.turtle_lines.is_empty() {
-                self.turtle_lines.pop();
-            }
             true
         } else {
             self.robot_x = self.start_x;
@@ -108,40 +86,6 @@ impl RobotField {
             self.start_y = y;
             self.reset_execution();
         }
-    }
-
-    pub fn turtle_forward(&mut self, dist: f64) {
-        let rad = self.turtle_angle.to_radians();
-        let old_x = self.robot_x as f64 + 0.5;
-        let old_y = self.robot_y as f64 + 0.5;
-        let new_x = (old_x + dist * rad.cos()).clamp(0.5, self.width as f64 - 0.5);
-        let new_y = (old_y - dist * rad.sin()).clamp(0.5, self.height as f64 - 0.5);
-        if self.turtle_pen_down {
-            self.turtle_lines.push(((old_x, old_y), (new_x, new_y)));
-        }
-        self.robot_x = (new_x - 0.5).round().clamp(0.0, (self.width - 1) as f64) as usize;
-        self.robot_y = (new_y - 0.5).round().clamp(0.0, (self.height - 1) as f64) as usize;
-        self.trace.push((self.robot_x, self.robot_y));
-    }
-
-    pub fn turtle_backward(&mut self, dist: f64) {
-        self.turtle_forward(-dist);
-    }
-
-    pub fn turtle_turn_left(&mut self, angle: f64) {
-        self.turtle_angle = (self.turtle_angle + angle).rem_euclid(360.0);
-    }
-
-    pub fn turtle_turn_right(&mut self, angle: f64) {
-        self.turtle_angle = (self.turtle_angle - angle).rem_euclid(360.0);
-    }
-
-    pub fn turtle_pen_down(&mut self) {
-        self.turtle_pen_down = true;
-    }
-
-    pub fn turtle_pen_up(&mut self) {
-        self.turtle_pen_down = false;
     }
 
     pub fn has_wall(&self, dir: &Direction) -> bool {
