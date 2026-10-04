@@ -1,10 +1,10 @@
 {
-  "app-id": "io.github.neomir.app",
+  "app-id": "io.github.NeooMir.NeoMir",
   "runtime": "org.gnome.Platform",
   "runtime-version": "50",
   "sdk": "org.gnome.Sdk",
   "sdk-extensions": [
-      "org.freedesktop.Sdk.Extension.rust-stable"
+    "org.freedesktop.Sdk.Extension.rust-stable"
   ],
   "command": "neomir",
   "finish-args": [
@@ -25,11 +25,13 @@
       "name": "neomir",
       "buildsystem": "meson",
       "sources": [
-        "cargo-sources.json",
         {
-          "type": "dir",
-          "path": "."
-        }
+          "type": "git",
+          "url": "https://github.com/NeooMir/NeoMir",
+          "tag": "v1.2",
+          "commit": "6a7d7334674f0fc40e00f5ae649bd00348e62f60"
+        },
+        "cargo-sources.json"
       ]
     }
   ]

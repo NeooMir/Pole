@@ -20,7 +20,6 @@ install_data('LICENSE', install_dir: datadir / 'licenses' / 'neomir')
 
 subdir('data')
 subdir('src')
-subdir('plugins')
 
 gnome.post_install(
   glib_compile_schemas: false,
