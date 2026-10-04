@@ -131,14 +131,12 @@ impl SettingsDialog {
 
         let win_parent = parent.clone();
 
-        // ==========================================
-        // Вкладка 1: Основные параметры (Темы, Язык, Редактор, Vim)
-        // ==========================================
+        //General settings
         let page_general = adw::PreferencesPage::new();
         page_general.set_title(lang.tr("tab_general"));
         page_general.set_icon_name(Some("preferences-system-symbolic"));
 
-        // Группа 1: Оформление и темы редактора
+        //Appearance and editor themes
         let theme_group = adw::PreferencesGroup::new();
         theme_group.set_title(lang.tr("grp_appearance"));
         theme_group.set_description(Some(lang.tr("desc_appearance")));
@@ -152,7 +150,7 @@ impl SettingsDialog {
         let string_list = gtk::StringList::new(&theme_names);
         theme_combo.set_model(Some(&string_list));
 
-        // Установка активной темы оформления
+        // Set active theme
         let current_theme = *editor_view.current_theme.borrow();
         if let Some(pos) = themes.iter().position(|t| *t == current_theme) {
             theme_combo.set_selected(pos as u32);
@@ -172,7 +170,7 @@ impl SettingsDialog {
         theme_group.add(&theme_combo);
         page_general.add(&theme_group);
 
-        // Группа 2: Язык интерфейса и локализация
+        //Interface language and localization
         let lang_group = adw::PreferencesGroup::new();
         lang_group.set_title(lang.tr("grp_language"));
         lang_group.set_description(Some(lang.tr("desc_language")));
@@ -216,7 +214,7 @@ impl SettingsDialog {
                 lang_combo_clone.set_subtitle("Текущий язык: Русский");
             }
 
-            // Динамическое обновление компонентов главного окна
+            // Dynamic update of main window components
             on_lang_change_cb();
 
             let alert = adw::AlertDialog::builder()
@@ -230,7 +228,7 @@ impl SettingsDialog {
         lang_group.add(&lang_combo);
         page_general.add(&lang_group);
 
-        // Группа 3: Редактор и режим Vim
+        //Editor and Vim mode
         let editor_group = adw::PreferencesGroup::new();
         editor_group.set_title(lang.tr("grp_editor"));
         editor_group.set_description(Some(lang.tr("desc_editor")));
@@ -293,9 +291,7 @@ impl SettingsDialog {
 
         dialog.add(&page_general);
 
-        // ==========================================
-        // Вкладка 2: Горячие клавиши
-        // ==========================================
+        //Keyboard shortcuts
         let page_shortcuts = adw::PreferencesPage::new();
         page_shortcuts.set_title(lang.tr("tab_shortcuts"));
         page_shortcuts.set_icon_name(Some("input-keyboard-symbolic"));
@@ -309,7 +305,7 @@ impl SettingsDialog {
         let win_sc = parent.clone();
         let is_en = lang.is_en();
 
-        // 1. Запуск выполнения программы (F5)
+        //run program
         let row_run = adw::ActionRow::new();
         row_run.set_title(lang.tr("sc_run"));
         let btn_run = gtk::Button::with_label(&kb_cfg.borrow().run.to_display_string());
@@ -337,7 +333,7 @@ impl SettingsDialog {
         row_run.add_suffix(&btn_run);
         shortcuts_group.add(&row_run);
 
-        // 2. Пошаговое выполнение (F10)
+        //step execution
         let row_step = adw::ActionRow::new();
         row_step.set_title(lang.tr("sc_step"));
         let btn_step = gtk::Button::with_label(&kb_cfg.borrow().step.to_display_string());
@@ -365,7 +361,7 @@ impl SettingsDialog {
         row_step.add_suffix(&btn_step);
         shortcuts_group.add(&row_step);
 
-        // 3. Сброс состояния исполнителя (F8)
+        //reset actor state
         let row_reset = adw::ActionRow::new();
         row_reset.set_title(lang.tr("sc_reset"));
         let btn_reset = gtk::Button::with_label(&kb_cfg.borrow().reset.to_display_string());
@@ -393,7 +389,7 @@ impl SettingsDialog {
         row_reset.add_suffix(&btn_reset);
         shortcuts_group.add(&row_reset);
 
-        // 4. Сохранение файла (Ctrl+S)
+        //Save file (Ctrl+S)
         let row_save = adw::ActionRow::new();
         row_save.set_title(lang.tr("sc_save"));
         let btn_save = gtk::Button::with_label(&kb_cfg.borrow().save.to_display_string());
@@ -421,7 +417,7 @@ impl SettingsDialog {
         row_save.add_suffix(&btn_save);
         shortcuts_group.add(&row_save);
 
-        // Сброс горячих клавиш к значениям по умолчанию
+        // Reset shortcuts to default values
         let btn_defaults = gtk::Button::with_label(lang.tr("btn_defaults"));
         btn_defaults.add_css_class("destructive-action");
         btn_defaults.set_halign(gtk::Align::Center);
@@ -450,9 +446,7 @@ impl SettingsDialog {
         page_shortcuts.add(&shortcuts_group);
         dialog.add(&page_shortcuts);
 
-        // ==========================================
-        // Вкладка 3: Расширения и плагины (пакеты .plug)
-        // ==========================================
+        //Extensions and plugins (.plug packages)
         let page_plugins = adw::PreferencesPage::new();
         page_plugins.set_title(lang.tr("tab_extensions"));
         page_plugins.set_icon_name(Some("application-x-addon-symbolic"));
@@ -476,7 +470,7 @@ impl SettingsDialog {
         let list_group = adw::PreferencesGroup::new();
         list_group.set_title(lang.tr("grp_installed_ext"));
 
-        // Вспомогательная функция обновления списка установленных плагинов
+        // Helper function to update the list of installed plugins
         let plugins_state = Rc::new(RefCell::new(Vec::new()));
         let list_group_rc = Rc::new(list_group.clone());
         let plug_lang = lang;
@@ -599,7 +593,7 @@ impl SettingsDialog {
 
         refresh_list();
 
-        // Подключение диалога выбора файла пакета .plug
+        // Connect .plug package file selection dialog
         {
             let win = parent.clone();
             let rf = refresh_list.clone();

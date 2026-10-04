@@ -48,7 +48,7 @@ impl IpcServer {
         let (ipc_tx, ipc_rx) = mpsc::channel::<IpcRequest>();
         let ipc_rx = Arc::new(Mutex::new(ipc_rx));
 
-        // Опрос очереди команд в главном GUI-потоке через таймер GLib (15 мс ~ 60 кадров/с)
+        // Poll command queue in the main GUI thread via GLib timer (15 ms ~ 60 fps)
         let rx_for_main = ipc_rx.clone();
         let f = field.clone();
         let fv = field_view.clone();
@@ -65,7 +65,7 @@ impl IpcServer {
             glib::ControlFlow::Continue
         });
 
-        // Фоновый поток для прослушивания входящих подключений сокета
+        // Background thread for listening to incoming socket connections
         thread::spawn(move || {
             for stream in listener.incoming() {
                 match stream {
@@ -127,7 +127,7 @@ impl IpcServer {
     ) -> String {
         let cmd = raw_cmd.trim();
 
-        // Извлечение имени команды из JSON или строки текста
+        // Extract command name from JSON or text string
         let cmd_name = if cmd.starts_with('{') {
             extract_cmd_val(cmd, "cmd")
                 .or_else(|| extract_cmd_val(cmd, "command"))
@@ -137,9 +137,7 @@ impl IpcServer {
         };
 
         match cmd_name.as_str() {
-            // ==========================================
-            // Перемещение и действия Робота
-            // ==========================================
+            // Robot movement and actions
             "move_up" | "up" | "вверх" => {
                 let mut f = field.borrow_mut();
                 match f.move_robot(&Direction::Up) {
@@ -245,18 +243,13 @@ impl IpcServer {
                     format_state(&f, "ok", Some(&msg))
                 }
             }
-
-            // ==========================================
-            // Запрос состояния и датчиков
-            // ==========================================
+            // State and sensor queries
             "get_state" | "status" => {
                 let f = field.borrow();
                 format_state(&f, "ok", None)
             }
 
-            // ==========================================
-            // Взаимодействие с консолью
-            // ==========================================
+            // Console interaction
             "set_console_input" | "console_set_input" => {
                 let text = extract_cmd_val(cmd, "text").unwrap_or_default();
                 console.py_entry.set_text(&text);

@@ -494,7 +494,7 @@ impl Parser {
                 Ok(expr)
             }
             // Robot sensor condition patterns:
-            // слева/справа/сверху/снизу свободно/стена
+            // left/right/up/down free/wall
             TokenKind::Sleva | TokenKind::Sprava | TokenKind::Sverhu | TokenKind::Snizu => {
                 self.advance();
                 let dir = match tok.kind {
@@ -521,7 +521,7 @@ impl Parser {
                     )),
                 }
             }
-            // клетка закрашена / клетка чистая
+            // cell is painted / cell is clean
             TokenKind::Kletka => {
                 self.advance();
                 let next = self.peek().clone();

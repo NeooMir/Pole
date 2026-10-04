@@ -90,7 +90,7 @@ impl PluginEngine {
                     if manifest.exists() {
                         if let Ok(content) = fs::read_to_string(&manifest) {
                             if let Some(meta) = PluginMetadata::from_json(&content) {
-                                // Сохраняем запущенный процесс, если плагин уже был загружен
+                                // Keep the running process if the plugin was already loaded
                                 let proc = self.plugins.remove(&meta.id).and_then(|lp| lp.process);
                                 new_map.insert(
                                     meta.id.clone(),
@@ -117,14 +117,14 @@ impl PluginEngine {
 
     pub fn install_plugin(&mut self, file_path: &Path) -> Result<PluginMetadata, String> {
         if !file_path.exists() {
-            return Err("Файл не найден".to_string());
+            return Err("File not found".to_string());
         }
 
         let temp_dir = std::env::temp_dir().join(format!("neomir_plug_{}", std::process::id()));
         let _ = fs::remove_dir_all(&temp_dir);
         fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
 
-        // Распаковываем установочный архив tar.gz (.plug)
+        // Extract the tar.gz installation archive (.plug)
         let status = Command::new("tar")
             .arg("-xzf")
             .arg(file_path)
@@ -135,7 +135,7 @@ impl PluginEngine {
         let manifest_path = temp_dir.join("plugin.json");
 
         if status.is_err() || !status.unwrap().success() || !manifest_path.exists() {
-            // Проверяем, является ли переданный файл одиночным манифестом plugin.json
+            // Check if the provided file is a single plugin.json manifest
             if let Ok(content) = fs::read_to_string(file_path) {
                 if let Some(meta) = PluginMetadata::from_json(&content) {
                     let target_dir = Self::plugins_dir().join(&meta.id);
@@ -147,20 +147,20 @@ impl PluginEngine {
                 }
             }
             let _ = fs::remove_dir_all(&temp_dir);
-            return Err("Не удалось распаковать .plug пакет или найти корректный plugin.json".to_string());
+            return Err("Failed to extract .plug package or find a valid plugin.json".to_string());
         }
 
         let content = fs::read_to_string(&manifest_path)
-            .map_err(|e| format!("Ошибка чтения plugin.json: {}", e))?;
+            .map_err(|e| format!("Error reading plugin.json: {}", e))?;
         let meta = PluginMetadata::from_json(&content)
-            .ok_or_else(|| "Некорректная структура файла plugin.json".to_string())?;
+            .ok_or_else(|| "Invalid plugin.json structure".to_string())?;
 
         if meta.id.trim().is_empty() {
             let _ = fs::remove_dir_all(&temp_dir);
-            return Err("Идентификатор плагина (id) не может быть пустым".to_string());
+            return Err("Plugin identifier (id) cannot be empty".to_string());
         }
 
-        // Рекурсивно копируем файлы плагина в целевую директорию
+        // Recursively copy plugin files to the target directory
         let target_dir = Self::plugins_dir().join(&meta.id);
         let _ = fs::remove_dir_all(&target_dir);
         fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
@@ -175,7 +175,7 @@ impl PluginEngine {
     pub fn set_plugin_enabled(&mut self, id: &str, enabled: bool) -> Result<(), String> {
         let manifest = Self::plugins_dir().join(id).join("plugin.json");
         if !manifest.exists() {
-            return Err("Плагин не найден".to_string());
+            return Err("Plugin not found".to_string());
         }
 
         let content = fs::read_to_string(&manifest).map_err(|e| e.to_string())?;
@@ -195,7 +195,7 @@ impl PluginEngine {
 
             Ok(())
         } else {
-            Err("Ошибка чтения манифеста плагина".to_string())
+            Err("Error reading plugin manifest".to_string())
         }
     }
 
@@ -210,23 +210,23 @@ impl PluginEngine {
     }
 
     pub fn launch_plugin(&mut self, id: &str) -> Result<(), String> {
-        let plugin = self.plugins.get_mut(id).ok_or_else(|| "Плагин не найден в реестре".to_string())?;
+        let plugin = self.plugins.get_mut(id).ok_or_else(|| "Plugin not found in registry".to_string())?;
 
         let entry = match plugin.metadata.entry {
             Some(ref e) if !e.trim().is_empty() => e.clone(),
-            _ => return Err("У плагина не задана точка входа (entry)".to_string()),
+            _ => return Err("Plugin entry point is not specified".to_string()),
         };
 
         let dir = Self::plugins_dir().join(id);
         let script_path = dir.join(&entry);
         if !script_path.exists() {
-            return Err(format!("Файл точки входа не найден: {}", script_path.display()));
+            return Err(format!("Entry point file not found: {}", script_path.display()));
         }
 
-        // Если процесс плагина уже активен, не создаем повторный экземпляр
+        // If the plugin process is already active, do not create a duplicate instance
         if let Some(ref mut child) = plugin.process {
             if let Ok(None) = child.try_wait() {
-                return Ok(()); // Уже запущен
+                return Ok(()); // Already running
             }
         }
 
@@ -239,7 +239,7 @@ impl PluginEngine {
                 .env("NEOMIR_SOCKET", sock_path.to_string_lossy().to_string())
                 .env("PYTHONPATH", &dir)
                 .spawn()
-                .map_err(|e| format!("Ошибка запуска процесса плагина (python3): {}", e))?
+                .map_err(|e| format!("Error launching plugin process (python3): {}", e))?
         } else {
             #[cfg(unix)]
             {
@@ -258,7 +258,7 @@ impl PluginEngine {
                 .current_dir(&dir)
                 .env("NEOMIR_SOCKET", sock_path.to_string_lossy().to_string())
                 .spawn()
-                .map_err(|e| format!("Ошибка запуска нативного бинарника плагина: {}", e))?
+                .map_err(|e| format!("Error launching native plugin binary: {}", e))?
         };
 
         plugin.process = Some(child);

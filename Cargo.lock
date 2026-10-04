@@ -581,7 +581,7 @@ dependencies = [
 
 [[package]]
 name = "neomir"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "directories",
  "flate2",

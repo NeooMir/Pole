@@ -23,9 +23,9 @@ impl RobotFieldView {
             Self::draw_field(&f, cr, width as f64, height as f64);
         });
 
-        // Жест нажатия мыши для интерактивного редактирования поля
+        // Mouse click gesture for interactive field editing
         let click_gesture = gtk::GestureClick::new();
-        click_gesture.set_button(0); // обрабатывать все кнопки мыши
+        click_gesture.set_button(0); // handle all mouse buttons
         let field_click = field.clone();
         let da_weak = drawing_area.downgrade();
 
@@ -61,7 +61,7 @@ impl RobotFieldView {
 
             match button {
                 1 => {
-                    // Левый клик: переключение закраски клетки или установка стены у границы
+                    // Left click: toggle cell paint or set wall at boundary
                     let fx = (rel_x / cell_size).fract();
                     let fy = (rel_y / cell_size).fract();
                     let threshold = 0.22;
@@ -79,7 +79,7 @@ impl RobotFieldView {
                     }
                 }
                 3 => {
-                    // Правый клик: перемещение начальной позиции Робота
+                    // Right click: move Robot's start position
                     f.set_start_pos(col, row);
                 }
                 _ => {}
@@ -115,15 +115,15 @@ impl RobotFieldView {
     }
 
     fn draw_field(field: &RobotField, cr: &Context, width: f64, height: f64) {
-        // Заливка фона поля
+        // Field background fill
         cr.set_source_rgb(0.97, 0.98, 0.99);
         cr.rectangle(0.0, 0.0, width, height);
         let _ = cr.fill();
 
         let (cell_size, offset_x, offset_y) = Self::compute_layout(field, width, height);
 
-        // Отрисовка закрашенных клеток
-        cr.set_source_rgb(0.72, 0.78, 0.85); // Классический серо-голубой цвет закраски КуМир
+        // Draw painted cells
+        cr.set_source_rgb(0.72, 0.78, 0.85); // Classic KuMir gray-blue paint color
         for r in 0..field.height {
             for c in 0..field.width {
                 if field.painted[r][c] {
@@ -135,7 +135,7 @@ impl RobotFieldView {
             }
         }
 
-        // Отрисовка линий координатной сетки
+        // Draw coordinate grid lines
         cr.set_source_rgb(0.78, 0.80, 0.84);
         cr.set_line_width(1.0);
 
@@ -153,7 +153,7 @@ impl RobotFieldView {
             let _ = cr.stroke();
         }
 
-        // Отрисовка траектории пройденного следа
+        // Draw trace of the passed path
         if field.trace.len() > 1 {
             cr.set_source_rgba(0.2, 0.5, 0.9, 0.35);
             for &(tx, ty) in &field.trace {
@@ -164,7 +164,7 @@ impl RobotFieldView {
             }
         }
 
-        // Отрисовка внутренних горизонтальных стен
+        // Draw internal horizontal walls
         cr.set_source_rgb(0.15, 0.18, 0.22);
         cr.set_line_width(4.5);
         cr.set_line_cap(gtk::cairo::LineCap::Round);
@@ -182,7 +182,7 @@ impl RobotFieldView {
             }
         }
 
-        // Отрисовка внутренних вертикальных стен
+        // Draw internal vertical walls
         for r in 0..field.height {
             for c in 0..field.v_walls[0].len() {
                 if field.v_walls[r][c] {
@@ -196,7 +196,7 @@ impl RobotFieldView {
             }
         }
 
-        // Отрисовка внешних границ поля (толстая рамка КуМир)
+        // Draw outer field boundaries (thick KuMir frame)
         cr.set_source_rgb(0.12, 0.14, 0.18);
         cr.set_line_width(5.0);
         let grid_w = cell_size * field.width as f64;
@@ -204,14 +204,14 @@ impl RobotFieldView {
         cr.rectangle(offset_x, offset_y, grid_w, grid_h);
         let _ = cr.stroke();
 
-        // Вычисление экранных координат Робота
+        // Calculate screen coordinates of the Robot
         let rx = offset_x + field.robot_x as f64 * cell_size + cell_size * 0.5;
         let ry = offset_y + field.robot_y as f64 * cell_size + cell_size * 0.5;
         let radius = cell_size * 0.36;
 
-        // Отрисовка исполнителя Робот
+        // Draw the Robot actor
         if field.crashed {
-            // Аварийное состояние (красный предупреждающий крест)
+            // Crashed state (red warning cross)
             cr.set_source_rgb(0.9, 0.2, 0.2);
             cr.arc(rx, ry, radius, 0.0, std::f64::consts::TAU);
             let _ = cr.fill();
@@ -225,14 +225,14 @@ impl RobotFieldView {
             cr.line_to(rx - d, ry + d);
             let _ = cr.stroke();
         } else {
-            // Исполнитель Робот: классический ромб с глазом
-            // Тень Робота
+            // Robot actor: classic rhombus with an eye
+            // Robot shadow
             cr.set_source_rgba(0.0, 0.0, 0.0, 0.18);
             cr.arc(rx, ry + 2.0, radius * 0.9, 0.0, std::f64::consts::TAU);
             let _ = cr.fill();
 
-            // Корпус (ромб)
-            cr.set_source_rgb(0.18, 0.45, 0.85); // Классический синий цвет КуМир
+            // Body (rhombus)
+            cr.set_source_rgb(0.18, 0.45, 0.85); // Classic KuMir blue color
             cr.move_to(rx, ry - radius);
             cr.line_to(rx + radius, ry);
             cr.line_to(rx, ry + radius);
@@ -240,7 +240,7 @@ impl RobotFieldView {
             cr.close_path();
             let _ = cr.fill();
 
-            // Обводка корпуса
+            // Body stroke
             cr.set_source_rgb(0.08, 0.25, 0.55);
             cr.set_line_width(2.0);
             cr.move_to(rx, ry - radius);
@@ -250,12 +250,12 @@ impl RobotFieldView {
             cr.close_path();
             let _ = cr.stroke();
 
-            // Глаз Робота
+            // Robot eye
             cr.set_source_rgb(1.0, 1.0, 1.0);
             cr.arc(rx, ry, radius * 0.38, 0.0, std::f64::consts::TAU);
             let _ = cr.fill();
 
-            // Зрачок
+            // Pupil
             cr.set_source_rgb(0.15, 0.2, 0.3);
             cr.arc(rx, ry, radius * 0.18, 0.0, std::f64::consts::TAU);
             let _ = cr.fill();
