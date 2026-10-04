@@ -8,13 +8,13 @@ DIST_DIR="$ROOT_DIR/dist"
 
 WORK_DIR="/tmp/neomir-deb-build"
 PACKAGE_NAME="neomir"
-VERSION="1.1"
+VERSION="1.2"
 ARCH="amd64"
 
-echo "==> Сборка релизного бинарника NeoMir..."
+echo "==> Building NeoMir release binary..."
 cargo build --release --manifest-path "$ROOT_DIR/Cargo.toml"
 
-echo "==> Подготовка файловой структуры DEB..."
+echo "==> Preparing DEB file structure..."
 rm -rf "$WORK_DIR"
 mkdir -p "$WORK_DIR/pkg/DEBIAN"
 mkdir -p "$WORK_DIR/pkg/usr/bin"
@@ -32,7 +32,7 @@ install -m 644 "$ROOT_DIR/data/icons/hicolor/scalable/apps/io.github.neomir.app.
 install -m 644 "$ROOT_DIR/data/icons/hicolor/symbolic/apps/io.github.neomir.app-symbolic.svg" "$WORK_DIR/pkg/usr/share/icons/hicolor/symbolic/apps/"
 install -m 644 "$ROOT_DIR/LICENSE" "$WORK_DIR/pkg/usr/share/doc/neomir/copyright"
 
-# Расчет размера в КБ
+# Calculate size in KB
 INSTALLED_SIZE=$(du -sk "$WORK_DIR/pkg/usr" | cut -f1)
 
 cat << EOF > "$WORK_DIR/pkg/DEBIAN/control"
@@ -49,7 +49,7 @@ Description: Educational programming environment for KuMir with Robot performer
  NeoMir is a modern KuMir-compatible educational IDE written in Rust with GTK4 and Libadwaita.
 EOF
 
-echo "==> Упаковка DEB пакета..."
+echo "==> Packaging DEB..."
 cd "$WORK_DIR"
 echo "2.0" > debian-binary
 
@@ -61,5 +61,5 @@ tar -czf "$WORK_DIR/data.tar.gz" --exclude='./DEBIAN' .
 DEB_FILE="$DIST_DIR/${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 ar rcs "$DEB_FILE" "$WORK_DIR/debian-binary" "$WORK_DIR/control.tar.gz" "$WORK_DIR/data.tar.gz"
 
-echo "==> DEB-пакет успешно создан:"
+echo "==> DEB package created successfully:"
 ls -lh "$DEB_FILE"

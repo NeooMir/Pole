@@ -9,28 +9,28 @@ DIST_DIR="$ROOT_DIR/dist"
 RPM_TOPDIR="/tmp/neomir-rpm-topdir"
 BUILD_ROOT="/tmp/neomir-rpm-buildroot"
 
-echo "==> Сборка релизного бинарника NeoMir..."
+echo "==> Building NeoMir release binary..."
 cargo build --release --manifest-path "$ROOT_DIR/Cargo.toml"
 
-echo "==> Подготовка файловой структуры пакета..."
+echo "==> Preparing package file structure..."
 rm -rf "$RPM_TOPDIR" "$BUILD_ROOT"
 mkdir -p "$RPM_TOPDIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 mkdir -p "$DIST_DIR"
 
-# Создание spec-файла
+# Create spec file
 cat << EOF > "$RPM_TOPDIR/SPECS/neomir.spec"
 Name:           neomir
-Version:        1.1
+Version:        1.2
 Release:        1%{?dist}
-Summary:        Среда учебного программирования NeoMir (КуМир / Робот)
+Summary:        NeoMir educational programming environment (KuMir / Robot)
 License:        GPL-2.0-or-later
 URL:            https://github.com/vptr/neomir
 
 AutoReqProv:    yes
 
 %description
-NeoMir — современный легковесный аналог среды КуМир с Исполнителем «Робот»,
-написанный на Rust с графическим интерфейсом на GTK4 и Libadwaita.
+NeoMir is a modern, lightweight alternative to the KuMir environment with the Robot performer,
+written in Rust with a graphical interface based on GTK4 and Libadwaita.
 
 %install
 mkdir -p %{buildroot}/usr/bin
@@ -58,7 +58,7 @@ install -m 644 "$ROOT_DIR/LICENSE" %{buildroot}/usr/share/licenses/neomir/LICENS
 %changelog
 EOF
 
-echo "==> Запуск rpmbuild..."
+echo "==> Running rpmbuild..."
 rpmbuild --define "_topdir $RPM_TOPDIR" \
          --buildroot "$BUILD_ROOT" \
          -bb "$RPM_TOPDIR/SPECS/neomir.spec"
@@ -66,5 +66,5 @@ rpmbuild --define "_topdir $RPM_TOPDIR" \
 RPM_FILE=$(find "$RPM_TOPDIR/RPMS" -name "*.rpm" | head -n 1)
 cp "$RPM_FILE" "$DIST_DIR/"
 
-echo "==> RPM-пакет успешно создан:"
+echo "==> RPM package created successfully:"
 ls -lh "$DIST_DIR/$(basename "$RPM_FILE")"
