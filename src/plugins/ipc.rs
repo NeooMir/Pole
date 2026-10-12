@@ -1,6 +1,7 @@
 use crate::robot::{Direction, RobotField};
 use crate::ui::console_view::ConsoleView;
 use crate::ui::field_view::RobotFieldView;
+use crate::ui::turtle_view::{TurtleState, TurtleView};
 use gtk::glib;
 use gtk::prelude::*;
 use std::cell::RefCell;
@@ -29,6 +30,8 @@ impl IpcServer {
     pub fn start(
         field: Rc<RefCell<RobotField>>,
         field_view: Rc<RobotFieldView>,
+        turtle: Rc<RefCell<TurtleState>>,
+        turtle_view: Rc<TurtleView>,
         console: Rc<ConsoleView>,
         status_label: gtk::Label,
     ) {
@@ -52,13 +55,15 @@ impl IpcServer {
         let rx_for_main = ipc_rx.clone();
         let f = field.clone();
         let fv = field_view.clone();
+        let t = turtle.clone();
+        let tv = turtle_view.clone();
         let con = console.clone();
         let status = status_label.clone();
 
         glib::timeout_add_local(Duration::from_millis(15), move || {
             if let Ok(rx) = rx_for_main.try_lock() {
                 while let Ok(req) = rx.try_recv() {
-                    let resp = Self::handle_command(&req.command, &f, &fv, &con, &status);
+                    let resp = Self::handle_command(&req.command, &f, &fv, &t, &tv, &con, &status);
                     let _ = req.response_tx.send(resp);
                 }
             }
@@ -122,6 +127,8 @@ impl IpcServer {
         raw_cmd: &str,
         field: &Rc<RefCell<RobotField>>,
         field_view: &Rc<RobotFieldView>,
+        turtle: &Rc<RefCell<TurtleState>>,
+        turtle_view: &Rc<TurtleView>,
         console: &Rc<ConsoleView>,
         status: &gtk::Label,
     ) -> String {
@@ -174,7 +181,7 @@ impl IpcServer {
                     }
                 }
             }
-            "move_left" | "left" | "влево" => {
+            "move_left" | "left" | "влево_робот" => {
                 let mut f = field.borrow_mut();
                 match f.move_robot(&Direction::Left) {
                     Ok(_) => {
@@ -192,7 +199,7 @@ impl IpcServer {
                     }
                 }
             }
-            "move_right" | "right" | "вправо" => {
+            "move_right" | "right" | "вправо_робот" => {
                 let mut f = field.borrow_mut();
                 match f.move_robot(&Direction::Right) {
                     Ok(_) => {
@@ -249,6 +256,96 @@ impl IpcServer {
                 format_state(&f, "ok", None)
             }
 
+            // Turtle commands
+            "turtle_forward" | "forward" | "вперед" | "вперёд" | "шаг" => {
+                let dist = extract_cmd_num(cmd, "dist")
+                    .or_else(|| extract_cmd_num(cmd, "distance"))
+                    .unwrap_or(50.0);
+                let mut t = turtle.borrow_mut();
+                t.forward(dist);
+                turtle_view.widget.queue_draw();
+                let msg = format!("Черепаха: вперёд ({:.0}), поз: ({:.0}, {:.0})", dist, t.x, t.y);
+                console.log_action(&msg);
+                status.set_text(&msg);
+                format!(r#"{{"status":"ok","x":{:.1},"y":{:.1},"angle":{:.1}}}"#, t.x, t.y, t.angle)
+            }
+            "turtle_backward" | "backward" | "назад" => {
+                let dist = extract_cmd_num(cmd, "dist")
+                    .or_else(|| extract_cmd_num(cmd, "distance"))
+                    .unwrap_or(50.0);
+                let mut t = turtle.borrow_mut();
+                t.backward(dist);
+                turtle_view.widget.queue_draw();
+                let msg = format!("Черепаха: назад ({:.0}), поз: ({:.0}, {:.0})", dist, t.x, t.y);
+                console.log_action(&msg);
+                status.set_text(&msg);
+                format!(r#"{{"status":"ok","x":{:.1},"y":{:.1},"angle":{:.1}}}"#, t.x, t.y, t.angle)
+            }
+            "turtle_left" | "turn_left" | "влево" | "налево" => {
+                let deg = extract_cmd_num(cmd, "angle")
+                    .or_else(|| extract_cmd_num(cmd, "deg"))
+                    .unwrap_or(90.0);
+                let mut t = turtle.borrow_mut();
+                t.turn_left(deg);
+                turtle_view.widget.queue_draw();
+                let msg = format!("Черепаха: поворот влево ({:.0}°), угол: {:.0}°", deg, t.angle);
+                console.log_action(&msg);
+                status.set_text(&msg);
+                format!(r#"{{"status":"ok","angle":{:.1}}}"#, t.angle)
+            }
+            "turtle_right" | "turn_right" | "вправо" | "направо" => {
+                let deg = extract_cmd_num(cmd, "angle")
+                    .or_else(|| extract_cmd_num(cmd, "deg"))
+                    .unwrap_or(90.0);
+                let mut t = turtle.borrow_mut();
+                t.turn_right(deg);
+                turtle_view.widget.queue_draw();
+                let msg = format!("Черепаха: поворот вправо ({:.0}°), угол: {:.0}°", deg, t.angle);
+                console.log_action(&msg);
+                status.set_text(&msg);
+                format!(r#"{{"status":"ok","angle":{:.1}}}"#, t.angle)
+            }
+            "turtle_pen_down" | "pen_down" | "опустить_хвост" | "опусти_хвост" => {
+                let mut t = turtle.borrow_mut();
+                t.set_pen(true);
+                turtle_view.widget.queue_draw();
+                let msg = "Черепаха: хвост опущен (рисует)";
+                console.log_action(msg);
+                status.set_text(msg);
+                r#"{"status":"ok","pen":true}"#.to_string()
+            }
+            "turtle_pen_up" | "pen_up" | "поднять_хвост" | "подними_хвост" => {
+                let mut t = turtle.borrow_mut();
+                t.set_pen(false);
+                turtle_view.widget.queue_draw();
+                let msg = "Черепаха: хвост поднят (движется без следа)";
+                console.log_action(msg);
+                status.set_text(msg);
+                r#"{"status":"ok","pen":false}"#.to_string()
+            }
+            "turtle_clear" | "clear" | "очистить_холст" => {
+                let mut t = turtle.borrow_mut();
+                t.clear();
+                turtle_view.widget.queue_draw();
+                let msg = "Черепаха: холст очищен";
+                console.log_action(msg);
+                status.set_text(msg);
+                r#"{"status":"ok"}"#.to_string()
+            }
+            "turtle_reset" | "домой" | "home" => {
+                let mut t = turtle.borrow_mut();
+                t.reset();
+                turtle_view.widget.queue_draw();
+                let msg = "Черепаха: возвращена в центр (0, 0)";
+                console.log_action(msg);
+                status.set_text(msg);
+                r#"{"status":"ok"}"#.to_string()
+            }
+            "turtle_status" => {
+                let t = turtle.borrow();
+                format!(r#"{{"status":"ok","x":{:.1},"y":{:.1},"angle":{:.1},"pen":{}}}"#, t.x, t.y, t.angle, t.pen_down)
+            }
+
             // Console interaction
             "set_console_input" | "console_set_input" => {
                 let text = extract_cmd_val(cmd, "text").unwrap_or_default();
@@ -298,6 +395,19 @@ fn extract_cmd_val(json: &str, field: &str) -> Option<String> {
 
     let end_quote = after_colon[1..].find('"')?;
     Some(after_colon[1..1 + end_quote].to_string())
+}
+
+fn extract_cmd_num(json: &str, field: &str) -> Option<f64> {
+    let key = format!("\"{}\"", field);
+    let key_pos = json.find(&key)?;
+    let after_key = &json[key_pos + key.len()..];
+    let colon_pos = after_key.find(':')?;
+    let after_colon = after_key[colon_pos + 1..].trim_start();
+    let num_str: String = after_colon
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
+        .collect();
+    num_str.parse::<f64>().ok()
 }
 
 fn format_state(f: &RobotField, status: &str, err_msg: Option<&str>) -> String {

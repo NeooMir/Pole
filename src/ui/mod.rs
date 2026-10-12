@@ -6,6 +6,7 @@ pub mod i18n;
 pub mod keybindings;
 pub mod settings_dialog;
 pub mod theme;
+pub mod turtle_view;
 pub mod vim_mode;
 
 pub use app_window::AppWindow;
@@ -13,3 +14,4 @@ pub use app_window::AppWindow;
 pub use editor_view::SyntaxMode;
 #[allow(unused_imports)]
 pub use i18n::Language;
+pub use turtle_view::{TurtleState, TurtleView};

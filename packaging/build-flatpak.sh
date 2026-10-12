@@ -6,7 +6,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$PROJECT_ROOT/dist"
 FLATPAK_BUILD_DIR="$PROJECT_ROOT/_flatpak_build"
 FLATPAK_REPO_DIR="$PROJECT_ROOT/_flatpak_repo"
-APP_ID="io.github.neomir.app"
+APP_ID="io.github.NeooMir.NeoMir"
 MANIFEST="$PROJECT_ROOT/$APP_ID.json"
 
 mkdir -p "$DIST_DIR"
@@ -51,7 +51,7 @@ flatpak-builder \
     "$MANIFEST"
 
 # 5. Create single-file bundle (.flatpak) in dist/
-BUNDLE_FILE="$DIST_DIR/neomir-1.2.0.flatpak"
+BUNDLE_FILE="$DIST_DIR/neomir-1.3.0.flatpak"
 echo "==> Creating standalone Flatpak bundle: $BUNDLE_FILE..."
 flatpak build-bundle "$FLATPAK_REPO_DIR" "$BUNDLE_FILE" "$APP_ID"
 

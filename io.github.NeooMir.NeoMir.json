@@ -28,8 +28,7 @@
         {
           "type": "git",
           "url": "https://github.com/NeooMir/NeoMir",
-          "tag": "v1.2",
-          "commit": "6a7d7334674f0fc40e00f5ae649bd00348e62f60"
+          "tag": "v1.3.0"
         },
         "cargo-sources.json"
       ]

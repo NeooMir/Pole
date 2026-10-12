@@ -31,7 +31,7 @@ impl AppWindow {
     pub fn new(app: &adw::Application) -> Self {
         let window = adw::ApplicationWindow::builder()
             .application(app)
-            .title("NeoMir")
+            .title("Pole")
             .default_width(1150)
             .default_height(780)
             .build();
@@ -68,9 +68,22 @@ impl AppWindow {
         let status_label = gtk::Label::new(Some(current_lang.tr("status_ready")));
         status_label.add_css_class("dim-label");
 
+        // Check if the turtle plugin is installed and enabled
+        let turtle_plugin_available = {
+            let engine = PluginEngine::global().lock().unwrap();
+            let plugins = engine.list_plugins();
+            plugins.iter().any(|p| p.id == "turtle" && p.enabled)
+        };
+
+        // Create TurtleState and TurtleView (always, but only shown when turtle plugin is active)
+        let turtle_state = Rc::new(RefCell::new(crate::ui::turtle_view::TurtleState::new()));
+        let turtle_view = Rc::new(crate::ui::turtle_view::TurtleView::new(turtle_state.clone()));
+
         IpcServer::start(
             field.clone(),
             field_view.clone(),
+            turtle_state.clone(),
+            turtle_view.clone(),
             console_view.clone(),
             status_label.clone(),
         );
@@ -117,6 +130,30 @@ impl AppWindow {
         let btn_size_20 = gtk::Button::with_label("20×20");
         btn_size_20.add_css_class("flat");
         field_tools_box.append(&btn_size_20);
+
+        // Performer Switcher (only visible if turtle plugin is installed)
+        // We use a Box that is shown/hidden based on plugin availability
+        let performer_sep = gtk::Separator::new(gtk::Orientation::Vertical);
+        let btn_performer_robot = gtk::ToggleButton::with_label("Робот");
+        btn_performer_robot.add_css_class("flat");
+        btn_performer_robot.set_active(true);
+        btn_performer_robot.set_tooltip_text(Some("Исполнитель: Робот КуМир"));
+
+        let btn_performer_turtle = gtk::ToggleButton::with_label("Черепаха");
+        btn_performer_turtle.add_css_class("flat");
+        btn_performer_turtle.set_tooltip_text(Some("Исполнитель: Черепаха (плагин)"));
+
+        // Mutually exclusive: clicking one unsets the other
+        btn_performer_turtle.set_group(Some(&btn_performer_robot));
+
+        // Container holding the performer selector - conditionally visible
+        let performer_box = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+        performer_box.append(&performer_sep);
+        performer_box.append(&btn_performer_robot);
+        performer_box.append(&btn_performer_turtle);
+        performer_box.set_visible(turtle_plugin_available);
+
+        field_tools_box.append(&performer_box);
 
         // Hamburger Menu Popover (All operations consolidated here)
         let menu_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
@@ -202,7 +239,7 @@ impl AppWindow {
                 .replacen("{}", &f.width.to_string(), 1)
                 .replacen("{}", &f.height.to_string(), 1)
         };
-        let title_widget = adw::WindowTitle::new("NeoMir", &initial_subtitle);
+        let title_widget = adw::WindowTitle::new("Pole", &initial_subtitle);
 
         // Tooltips with shortcut keys
         let update_tooltips = {
@@ -635,7 +672,7 @@ impl AppWindow {
                 pop.popdown();
                 let lang = *lr.borrow();
                 let about = adw::AboutDialog::builder()
-                    .application_name("NeoMir")
+                    .application_name("Pole")
                     .developer_name(lang.tr("about_devs"))
                     .version(env!("CARGO_PKG_VERSION"))
                     .comments(lang.tr("about_comments"))
@@ -643,7 +680,7 @@ impl AppWindow {
                     .issue_url("https://github.com/neoomir/neomir/issues")
                     .license_type(gtk::License::Gpl20)
                     .application_icon("io.github.neomir.app")
-                    .copyright("© 2026 NeoMir")
+                    .copyright("© 2026 Pole")
                     .build();
                 about.present(Some(&win));
             });
@@ -724,11 +761,22 @@ impl AppWindow {
             });
         }
 
+        // Canvas Stack: Robot Field ↔ Turtle Canvas (switched by performer selector)
+        let canvas_stack = gtk::Stack::new();
+        canvas_stack.set_transition_type(gtk::StackTransitionType::Crossfade);
+        canvas_stack.set_transition_duration(120);
+        canvas_stack.set_vexpand(true);
+        canvas_stack.set_hexpand(true);
+        canvas_stack.add_named(&field_view.widget, Some("robot"));
+        canvas_stack.add_named(&turtle_view.widget, Some("turtle"));
+        // Start on robot page
+        canvas_stack.set_visible_child_name("robot");
+
         // Right side: Field + Field Tools + Console View
         let right_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
         right_box.append(&field_tools_box);
         right_box.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
-        right_box.append(&field_view.widget);
+        right_box.append(&canvas_stack);
         right_box.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
         right_box.append(&console_view.container);
 
@@ -756,6 +804,115 @@ impl AppWindow {
         root_box.append(&status_box);
 
         window.set_content(Some(&root_box));
+
+        // Performer switcher: Robot ↔ Turtle
+        // Only wired if turtle plugin is available - otherwise btn_performer_robot/turtle
+        // remain hidden and this is a no-op
+        {
+            let stack = canvas_stack.clone();
+            let btn_clear_walls_ref = btn_clear_walls.clone();
+            let btn_clear_paint_ref = btn_clear_paint.clone();
+            let btn_size_10_ref = btn_size_10.clone();
+            let btn_size_15_ref = btn_size_15.clone();
+            let btn_size_20_ref = btn_size_20.clone();
+            let lbl_field_ref = lbl_field.clone();
+            let tw = title_widget.clone();
+            let stat = status_label.clone();
+
+            btn_performer_robot.connect_toggled(move |btn| {
+                if btn.is_active() {
+                    stack.set_visible_child_name("robot");
+                    // Show robot-specific toolbar controls
+                    btn_clear_walls_ref.set_visible(true);
+                    btn_clear_paint_ref.set_visible(true);
+                    btn_size_10_ref.set_visible(true);
+                    btn_size_15_ref.set_visible(true);
+                    btn_size_20_ref.set_visible(true);
+                    lbl_field_ref.set_visible(true);
+                    tw.set_subtitle("КуМир Робот");
+                    stat.set_text("Исполнитель: Робот");
+                }
+            });
+        }
+        {
+            let stack = canvas_stack.clone();
+            let btn_clear_walls_ref = btn_clear_walls.clone();
+            let btn_clear_paint_ref = btn_clear_paint.clone();
+            let btn_size_10_ref = btn_size_10.clone();
+            let btn_size_15_ref = btn_size_15.clone();
+            let btn_size_20_ref = btn_size_20.clone();
+            let lbl_field_ref = lbl_field.clone();
+            let ev = editor_view.clone();
+            let tw = title_widget.clone();
+            let stat = status_label.clone();
+            let turtle_view_ref = turtle_view.clone();
+
+            btn_performer_turtle.connect_toggled(move |btn| {
+                if btn.is_active() {
+                    stack.set_visible_child_name("turtle");
+                    // Hide robot-specific toolbar controls
+                    btn_clear_walls_ref.set_visible(false);
+                    btn_clear_paint_ref.set_visible(false);
+                    btn_size_10_ref.set_visible(false);
+                    btn_size_15_ref.set_visible(false);
+                    btn_size_20_ref.set_visible(false);
+                    lbl_field_ref.set_visible(false);
+                    tw.set_subtitle("Черепаха");
+                    stat.set_text("Исполнитель: Черепаха");
+
+                    // Insert boilerplate template into editor if editor is empty or still has default KuMir stub
+                    let start = ev.buffer.start_iter();
+                    let end = ev.buffer.end_iter();
+                    let current_text = ev.buffer.text(&start, &end, false).to_string();
+                    let trimmed = current_text.trim();
+                    let is_blank_or_default = trimmed.is_empty()
+                        || trimmed == "алг
+нач
+кон"
+                        || trimmed == "алг
+нач
+кон"
+                        || trimmed.starts_with("алг
+нач
+  | Напишите");
+
+                    if is_blank_or_default {
+                        // Choose boilerplate based on current syntax mode
+                        let template = if ev.syntax_mode() == crate::ui::editor_view::SyntaxMode::Python {
+                            r#"# Черепаха: программа на Python
+# Доступные команды:
+#   вперёд(шаги) / forward(steps)
+#   назад(шаги) / backward(steps)
+#   влево(угол) / turn_left(deg)
+#   вправо(угол) / turn_right(deg)
+#   опустить_хвост() / pen_down()
+#   поднять_хвост() / pen_up()
+#   очистить_холст() / clear()
+#   домой() / home()
+
+# Рисуем квадрат со стороной 100:
+for _ in range(4):
+    вперёд(100)
+    вправо(90)
+"#
+                        } else {
+                            r#"алг
+нач
+  | Напишите программу для Черепахи
+  | Команды: вперёд(N), назад(N), влево(N), вправо(N)
+  |          опустить хвост, поднять хвост, сброс
+  иcп Черепаха
+кон"#
+                        };
+                        ev.buffer.set_text(template);
+                        ev.rehighlight();
+                    }
+
+                    // Refresh turtle canvas
+                    turtle_view_ref.widget.queue_draw();
+                }
+            });
+        }
 
         // Step function closure
         let do_step_fn = {
@@ -798,6 +955,7 @@ impl AppWindow {
             let lr = lang_ref.clone();
             let stat = status_label.clone();
             let fv = field_view.clone();
+            let tv = turtle_view.clone();
 
             btn_run.connect_clicked(move |_| {
                 let lang = *lr.borrow();
@@ -843,15 +1001,29 @@ def _send(payload):
     return client_sock.recv(4096).decode().strip()
 
 # Robot commands
-up = вверх = lambda: _send("up")
-down = вниз = lambda: _send("down")
-left = влево = lambda: _send("left")
-right = вправо = lambda: _send("right")
-paint = закрасить = lambda: _send("paint")
-step_back = назад_робот = lambda: _send("step_back")
-reset = сброс = lambda: _send("reset")
+up = вверх = lambda: _send({{"cmd": "up"}})
+down = вниз = lambda: _send({{"cmd": "down"}})
+left = влево_робот = lambda: _send({{"cmd": "move_left"}})
+right = вправо_робот = lambda: _send({{"cmd": "move_right"}})
+paint = закрасить = lambda: _send({{"cmd": "paint"}})
+step_back = назад_робот = lambda: _send({{"cmd": "step_back"}})
+reset = сброс = lambda: _send({{"cmd": "reset"}})
 
-
+# Turtle commands
+def _turtle(cmd, **kw):
+    payload = {{"cmd": cmd}}
+    payload.update(kw)
+    return _send(payload)
+def вперёд(n): return _turtle("turtle_forward", dist=n)
+def назад(n): return _turtle("turtle_backward", dist=n)
+def влево(n): return _turtle("turtle_left", angle=n)
+def вправо(n): return _turtle("turtle_right", angle=n)
+def опустить_хвост(): return _turtle("turtle_pen_down")
+def поднять_хвост(): return _turtle("turtle_pen_up")
+def очистить_холст(): return _turtle("turtle_clear")
+def домой(): return _turtle("turtle_reset")
+forward = вперёд; backward = назад; turn_left = влево; turn_right = вправо
+pen_down = опустить_хвост; pen_up = поднять_хвост; clear = очистить_холст; home = домой
 
 {}
 "#, py_code);
@@ -879,6 +1051,7 @@ reset = сброс = lambda: _send("reset")
                     let stat_loop = stat.clone();
                     let lr_loop = lr.clone();
                     let fv_loop = fv.clone();
+                    let tv_loop = tv.clone();
 
                     glib::timeout_add_local(Duration::from_millis(50), move || {
                         match receiver.try_recv() {
@@ -887,6 +1060,7 @@ reset = сброс = lambda: _send("reset")
                                 *is_r_loop.borrow_mut() = false;
                                 Self::set_btn_content(&b_run_loop, "media-playback-start-symbolic", lang_inner.tr("run"));
                                 fv_loop.widget.queue_draw();
+                                tv_loop.widget.queue_draw();
 
                                 match result {
                                     Ok((stdout_str, stderr_str)) => {
@@ -946,7 +1120,11 @@ reset = сброс = lambda: _send("reset")
                         }
                         Err(e) => {
                             let prefix = if lang.is_en() { "Compilation error" } else { "Ошибка компиляции" };
-                            con.print_error(&format!("{}: {}", prefix, e));
+                            let err_msg = format!("{}: {}", prefix, e);
+                            con.print_error(&err_msg);
+                            stat.set_text(&err_msg);
+                            *running = false;
+                            Self::set_btn_content(&b_run, "media-playback-start-symbolic", lang.tr("run"));
                             return;
                         }
                     }

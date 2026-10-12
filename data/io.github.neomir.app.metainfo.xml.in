@@ -3,8 +3,8 @@
   <id>io.github.neomir.app</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-2.0-or-later</project_license>
-  <name>NeoMir</name>
-  <name xml:lang="ru">NeoMir</name>
+  <name>Pole</name>
+  <name xml:lang="ru">Поле</name>
   <summary>Educational programming environment for KuMir with Robot performer</summary>
   <summary xml:lang="ru">Среда учебного программирования NeoMir (КуМир / Исполнитель Робот)</summary>
   <url type="homepage">https://github.com/neoomir/neomir</url>
@@ -26,13 +26,19 @@
   <screenshots>
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/neoomir/neomir/main/data/screenshot.png</image>
-      <caption>NeoMir IDE with Robot Field and Editor</caption>
-      <caption xml:lang="ru">Среда NeoMir с полем Робота и редактором</caption>
+      <caption>Pole IDE with Robot Field and Editor</caption>
+      <caption xml:lang="ru">Среда Поле с полем Робота и редактором</caption>
     </screenshot>
   </screenshots>
   <launchable type="desktop-id">io.github.neomir.app.desktop</launchable>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.3.0" date="2026-10-12">
+      <description>
+        <p>Release 1.3.0: Added integrated Turtle performer, GNOME HIG icons, Python integration, multi-language support (RU/EN), and UI performance improvements.</p>
+        <p xml:lang="ru">Релиз 1.3.0: Добавлен встроенный исполнитель Черепаха, обновлённые иконки по GNOME HIG, поддержка Python, многоязычный интерфейс (RU/EN) и улучшенная производительность.</p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-09-29">
       <description>
         <p>Initial release of NeoMir under GNU GPLv2: Robot performer, KuMir language VM, syntax themes, and Vim mode.</p>

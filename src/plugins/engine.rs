@@ -60,13 +60,36 @@ impl PluginEngine {
                             let target = user_dir.join(&plugin_id);
                             if !target.exists() {
                                 let _ = copy_dir_recursive(&path, &target);
-                            } else if let Ok(file_entries) = fs::read_dir(&path) {
-                                for file in file_entries.flatten() {
-                                    let fname = file.file_name();
-                                    if fname != "plugin.json" {
-                                        let src_f = path.join(&fname);
-                                        let dst_f = target.join(&fname);
-                                        let _ = fs::copy(&src_f, &dst_f);
+                            } else {
+                                // Sync metadata while preserving user's enabled status
+                                if let Ok(src_content) = fs::read_to_string(path.join("plugin.json")) {
+                                    if let Some(mut bundled_meta) = PluginMetadata::from_json(&src_content) {
+                                        if let Ok(tgt_content) = fs::read_to_string(target.join("plugin.json")) {
+                                            if let Some(tgt_meta) = PluginMetadata::from_json(&tgt_content) {
+                                                bundled_meta.enabled = tgt_meta.enabled;
+                                            }
+                                        }
+                                        let _ = fs::write(target.join("plugin.json"), bundled_meta.to_json());
+                                    }
+                                }
+                                // Remove obsolete files in target that no longer exist in bundled source
+                                if let Ok(target_entries) = fs::read_dir(&target) {
+                                    for t_entry in target_entries.flatten() {
+                                        let fname = t_entry.file_name();
+                                        if fname != "plugin.json" && !path.join(&fname).exists() {
+                                            let _ = fs::remove_file(t_entry.path());
+                                        }
+                                    }
+                                }
+                                // Copy updated files
+                                if let Ok(file_entries) = fs::read_dir(&path) {
+                                    for file in file_entries.flatten() {
+                                        let fname = file.file_name();
+                                        if fname != "plugin.json" {
+                                            let src_f = path.join(&fname);
+                                            let dst_f = target.join(&fname);
+                                            let _ = fs::copy(&src_f, &dst_f);
+                                        }
                                     }
                                 }
                             }

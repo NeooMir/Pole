@@ -51,7 +51,7 @@ impl Language {
             (Language::Ru, "extensions") => "Расширения",
             (Language::En, "py_console") => "Python Console",
             (Language::Ru, "py_console") => "Консоль Python",
-            (Language::En, "about") => "About NeoMir",
+            (Language::En, "about") => "About Pole",
             (Language::Ru, "about") => "О программе",
             (Language::En, "menu_load") => "Open Algorithm...",
             (Language::Ru, "menu_load") => "Загрузить алгоритм...",
@@ -173,8 +173,8 @@ impl Language {
             (Language::Ru, "file_saved") => "Файл успешно сохранён: {}",
 
             // Settings Dialog
-            (Language::En, "settings_title") => "NeoMir Settings",
-            (Language::Ru, "settings_title") => "Настройки NeoMir",
+            (Language::En, "settings_title") => "Pole Settings",
+            (Language::Ru, "settings_title") => "Настройки Поле",
             (Language::En, "tab_general") => "General",
             (Language::Ru, "tab_general") => "Основные",
             (Language::En, "tab_shortcuts") => "Shortcuts",
@@ -273,8 +273,8 @@ impl Language {
 Developed with Rust, GTK4, and Libadwaita.",
             (Language::Ru, "about_comments") => "Современная среда учебного программирования на алгоритмическом языке КуМир с Исполнителем «Робот».
 Разработано на Rust, GTK4 и Libadwaita.",
-            (Language::En, "about_devs") => "NeoMir Developers",
-            (Language::Ru, "about_devs") => "Разработчики NeoMir",
+            (Language::En, "about_devs") => "Pole Developers",
+            (Language::Ru, "about_devs") => "Разработчики Поле",
 
             // Language Changed Alert
             (Language::En, "lang_changed_title") => "Interface Language",

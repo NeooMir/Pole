@@ -213,8 +213,8 @@ mod tests {
         let ru = Language::Ru;
         assert_eq!(en.tr("run"), "Run");
         assert_eq!(ru.tr("run"), "Выполнить");
-        assert_eq!(en.tr("settings_title"), "NeoMir Settings");
-        assert_eq!(ru.tr("settings_title"), "Настройки NeoMir");
+        assert_eq!(en.tr("settings_title"), "Pole Settings");
+        assert_eq!(ru.tr("settings_title"), "Настройки Поле");
         assert_eq!(en.tr("theme_title"), "Color Theme");
         assert_eq!(ru.tr("theme_title"), "Тема оформления");
         assert!(en.is_en());
