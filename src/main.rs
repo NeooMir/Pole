@@ -9,7 +9,7 @@ mod ui;
 use crate::ui::AppWindow;
 use adw::prelude::*;
 
-const APP_ID: &str = "io.github.neomir.app";
+const APP_ID: &str = "io.github.NeooMir.Pole";
 
 fn main() -> glib::ExitCode {
     let app = adw::Application::builder()

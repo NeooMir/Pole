@@ -676,10 +676,10 @@ impl AppWindow {
                     .developer_name(lang.tr("about_devs"))
                     .version(env!("CARGO_PKG_VERSION"))
                     .comments(lang.tr("about_comments"))
-                    .website("https://github.com/neoomir/neomir")
-                    .issue_url("https://github.com/neoomir/neomir/issues")
+                    .website("https://github.com/NeooMir/Pole")
+                    .issue_url("https://github.com/NeooMir/Pole/issues")
                     .license_type(gtk::License::Gpl20)
-                    .application_icon("io.github.neomir.app")
+                    .application_icon("io.github.NeooMir.Pole")
                     .copyright("© 2026 Pole")
                     .build();
                 about.present(Some(&win));

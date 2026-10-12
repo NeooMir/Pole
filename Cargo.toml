@@ -1,10 +1,10 @@
 [package]
-name = "neomir"
+name = "pole"
 version = "1.3.0"
 edition = "2024"
 license = "GPL-2.0-or-later"
 description = "Modern educational programming environment for KuMir algorithmic language with Robot performer"
-repository = "https://github.com/neoomir/neomir"
+repository = "https://github.com/NeooMir/Pole"
 
 [dependencies]
 adw = { package = "libadwaita", version = "0.7", features = ["v1_5"] }

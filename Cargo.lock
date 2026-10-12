@@ -580,23 +580,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "neomir"
-version = "1.3.0"
-dependencies = [
- "directories",
- "flate2",
- "glib",
- "gtk4",
- "libadwaita",
- "libc",
- "pango",
- "serde",
- "serde_json",
- "tar",
- "tempfile",
-]
-
-[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -643,6 +626,23 @@ name = "pkg-config"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
+
+[[package]]
+name = "pole"
+version = "1.3.0"
+dependencies = [
+ "directories",
+ "flate2",
+ "glib",
+ "gtk4",
+ "libadwaita",
+ "libc",
+ "pango",
+ "serde",
+ "serde_json",
+ "tar",
+ "tempfile",
+]
 
 [[package]]
 name = "proc-macro-crate"

@@ -1,6 +1,6 @@
 desktop_file = i18n.merge_file(
-  input: 'io.github.neomir.app.desktop.in',
-  output: 'io.github.neomir.app.desktop',
+  input: 'io.github.NeooMir.Pole.desktop.in',
+  output: 'io.github.NeooMir.Pole.desktop',
   type: 'desktop',
   po_dir: '../po',
   install: true,
@@ -13,8 +13,8 @@ if desktop_utils.found()
 endif
 
 appstream_file = i18n.merge_file(
-  input: 'io.github.neomir.app.metainfo.xml.in',
-  output: 'io.github.neomir.app.metainfo.xml',
+  input: 'io.github.NeooMir.Pole.metainfo.xml.in',
+  output: 'io.github.NeooMir.Pole.metainfo.xml',
   po_dir: '../po',
   install: true,
   install_dir: datadir / 'metainfo'
@@ -28,11 +28,11 @@ if appstreamcli.found()
 endif
 
 install_data(
-  'icons/hicolor/scalable/apps/io.github.neomir.app.svg',
+  'icons/hicolor/scalable/apps/io.github.NeooMir.Pole.svg',
   install_dir: datadir / 'icons' / 'hicolor' / 'scalable' / 'apps'
 )
 
 install_data(
-  'icons/hicolor/symbolic/apps/io.github.neomir.app-symbolic.svg',
+  'icons/hicolor/symbolic/apps/io.github.NeooMir.Pole-symbolic.svg',
   install_dir: datadir / 'icons' / 'hicolor' / 'symbolic' / 'apps'
 )
