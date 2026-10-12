@@ -1,4 +1,4 @@
-# NeoMir
+# Pole
 
 A modern, high-performance educational IDE and virtual machine. Built as a fast, native Rust alternative to the legacy KuMir environment.
 
@@ -18,8 +18,8 @@ Designed for algorithmic training without the bloat, featuring a custom scriptin
 Requirements: standard Rust toolchain (cargo, rustc).
 
 ```
-git clone [https://github.com/your-username/NeoMir.git](https://github.com/your-username/NeoMir.git)
-cd NeoMir
+git clone https://github.com/NeooMir/Pole.git
+cd Pole
 cargo build --release
 cargo run --release
 ```
