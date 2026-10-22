@@ -9,6 +9,8 @@ use crate::ui::i18n::Language;
 use crate::ui::keybindings::KeybindingsConfig;
 use crate::ui::settings_dialog::{AppSettings, SettingsDialog};
 use crate::ui::theme::ThemeId;
+use crate::ui::blocks_view::BlocksView;
+use crate::ui::docs_window::DocsWindow;
 use adw::prelude::*;
 use gtk::{gdk, glib};
 use std::cell::RefCell;
@@ -42,8 +44,22 @@ impl AppWindow {
 
         let field = Rc::new(RefCell::new(RobotField::new(10, 10)));
         let editor_view = Rc::new(EditorView::new());
+        let blocks_view = Rc::new(BlocksView::new(current_lang));
         let field_view = Rc::new(RobotFieldView::new(field.clone()));
         let console_view = Rc::new(ConsoleView::new(current_lang));
+
+        // Sync blocks changes to editor buffer
+        {
+            let ev = editor_view.clone();
+            blocks_view.set_on_change(move |code| {
+                ev.buffer.set_text(code);
+                ev.update_gutter();
+                ev.rehighlight();
+            });
+        }
+        editor_view.buffer.set_text(&blocks_view.to_kumir());
+        editor_view.update_gutter();
+        editor_view.rehighlight();
 
         let vm: Rc<RefCell<Option<VirtualMachine>>> = Rc::new(RefCell::new(None));
         let is_running = Rc::new(RefCell::new(false));
@@ -96,6 +112,17 @@ impl AppWindow {
         let btn_step = gtk::Button::new();
         Self::set_btn_content(&btn_step, "media-seek-forward-symbolic", current_lang.tr("step"));
 
+        blocks_view.set_exec_buttons(btn_run.clone(), btn_step.clone());
+
+        // Mode switch buttons for Text (KuMir) vs Blocks (Scratch)
+        let btn_mode_text = gtk::ToggleButton::with_label(current_lang.tr("mode_text"));
+        btn_mode_text.add_css_class("flat");
+        btn_mode_text.set_active(true);
+
+        let btn_mode_blocks = gtk::ToggleButton::with_label(current_lang.tr("mode_blocks"));
+        btn_mode_blocks.add_css_class("flat");
+        btn_mode_blocks.set_group(Some(&btn_mode_text));
+
         // Field Tools Bar
         let field_tools_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
         field_tools_box.set_margin_start(8);
@@ -137,11 +164,11 @@ impl AppWindow {
         let btn_performer_robot = gtk::ToggleButton::with_label("Робот");
         btn_performer_robot.add_css_class("flat");
         btn_performer_robot.set_active(true);
-        btn_performer_robot.set_tooltip_text(Some("Исполнитель: Робот КуМир"));
+        btn_performer_robot.set_tooltip_text(Some("Исполнитель: Робот"));
 
         let btn_performer_turtle = gtk::ToggleButton::with_label("Черепаха");
         btn_performer_turtle.add_css_class("flat");
-        btn_performer_turtle.set_tooltip_text(Some("Исполнитель: Черепаха (плагин)"));
+        btn_performer_turtle.set_tooltip_text(Some("Исполнитель: Черепаха"));
 
         // Mutually exclusive: clicking one unsets the other
         btn_performer_turtle.set_group(Some(&btn_performer_robot));
@@ -217,6 +244,11 @@ impl AppWindow {
         Self::set_btn_content(&btn_menu_extensions, "application-x-addon-symbolic", current_lang.tr("extensions"));
         btn_menu_extensions.add_css_class("flat");
         menu_box.append(&btn_menu_extensions);
+
+        let btn_menu_docs = gtk::Button::new();
+        Self::set_btn_content(&btn_menu_docs, "help-browser-symbolic", current_lang.tr("menu_docs"));
+        btn_menu_docs.add_css_class("flat");
+        menu_box.append(&btn_menu_docs);
 
         let btn_menu_about = gtk::Button::new();
         Self::set_btn_content(&btn_menu_about, "help-about-symbolic", current_lang.tr("about"));
@@ -304,6 +336,7 @@ impl AppWindow {
             let b_menu = btn_menu.clone();
             let b_m_settings = btn_menu_settings.clone();
             let b_m_ext = btn_menu_extensions.clone();
+            let b_m_docs = btn_menu_docs.clone();
             let b_m_py = btn_menu_python.clone();
             let b_m_about = btn_menu_about.clone();
             let l_field = lbl_field.clone();
@@ -314,6 +347,9 @@ impl AppWindow {
             let ut = update_tooltips.clone();
             let sync = sync_performer_ui.clone();
             let ev = editor_view.clone();
+            let b_m_text = btn_mode_text.clone();
+            let b_m_blocks = btn_mode_blocks.clone();
+            let bv_lang = blocks_view.clone();
 
             Rc::new(move || {
                 let lang = *lr.borrow();
@@ -336,6 +372,7 @@ impl AppWindow {
                 b_menu.set_tooltip_text(Some(lang.tr("main_menu")));
                 Self::set_btn_content(&b_m_settings, "preferences-system-symbolic", lang.tr("settings"));
                 Self::set_btn_content(&b_m_ext, "application-x-addon-symbolic", lang.tr("extensions"));
+                Self::set_btn_content(&b_m_docs, "help-browser-symbolic", lang.tr("menu_docs"));
                 Self::set_btn_content(&b_m_py, "utilities-terminal-symbolic", lang.tr("py_console"));
                 Self::set_btn_content(&b_m_about, "help-about-symbolic", lang.tr("about"));
 
@@ -346,6 +383,9 @@ impl AppWindow {
                 b_paint.set_tooltip_text(Some(lang.tr("tip_clear_paint")));
 
                 con.set_language(lang);
+                b_m_text.set_label(lang.tr("mode_text"));
+                b_m_blocks.set_label(lang.tr("mode_blocks"));
+                bv_lang.set_language(lang);
                 ut();
                 sync();
             })
@@ -362,6 +402,8 @@ impl AppWindow {
             let is_r = is_running.clone();
             let b_run = btn_run.clone();
             let lr_clone = lang_ref.clone();
+            let turtle_state_clone = turtle_state.clone();
+            let turtle_view_clone = turtle_view.clone();
             Rc::new(move || {
                 let lang = *lr_clone.borrow();
                 *is_r.borrow_mut() = false;
@@ -369,6 +411,8 @@ impl AppWindow {
                 *vm_clone.borrow_mut() = None;
                 f_clone.borrow_mut().reset_execution();
                 fv_clone.widget.queue_draw();
+                turtle_state_clone.borrow_mut().reset();
+                turtle_view_clone.widget.queue_draw();
                 ev_clone.highlight_line(None);
                 stat_clone.set_text(lang.tr("status_ready"));
                 con_clone.print_info(lang.tr("field_reset_msg"));
@@ -383,8 +427,26 @@ impl AppWindow {
             let stat_clone = status_label.clone();
             let lr_clone = lang_ref.clone();
             let sync_clone = sync_performer_ui.clone();
+            let turtle_state_clone = turtle_state.clone();
+            let turtle_view_clone = turtle_view.clone();
+            let b_turtle = btn_performer_turtle.clone();
             Rc::new(move || {
                 let lang = *lr_clone.borrow();
+                if b_turtle.is_active() {
+                    let ok = turtle_state_clone.borrow_mut().step_back();
+                    turtle_view_clone.widget.queue_draw();
+                    if ok {
+                        let msg = if lang.is_en() { "Turtle returned back one step" } else { "Черепаха: шаг назад" };
+                        con_clone.log_action(msg);
+                        stat_clone.set_text(msg);
+                    } else {
+                        let msg = if lang.is_en() { "Turtle is already at start position" } else { "Черепаха уже в исходной точке" };
+                        con_clone.log_action(msg);
+                        stat_clone.set_text(msg);
+                    }
+                    return;
+                }
+
                 let mut f = f_clone.borrow_mut();
                 let ok = f.step_back();
                 let (rx, ry) = (f.robot_x + 1, f.robot_y + 1);
@@ -415,6 +477,7 @@ impl AppWindow {
             let lr = lang_ref.clone();
             let st = app_settings.clone();
             let b_m_syn = btn_menu_syntax.clone();
+            let bv_clone = blocks_view.clone();
             Rc::new(move || {
                 let lang = *lr.borrow();
                 let dialog = gtk::FileChooserNative::new(
@@ -444,6 +507,7 @@ impl AppWindow {
                 let lr_clone = lr.clone();
                 let st_clone = st.clone();
                 let b_syn_clone = b_m_syn.clone();
+                let bv_inner = bv_clone.clone();
 
                 dialog.connect_response(move |d, response| {
                     if response == gtk::ResponseType::Accept {
@@ -467,6 +531,7 @@ impl AppWindow {
                                                 st_clone.borrow_mut().syntax_mode = "kumir".to_string();
                                                 let _ = st_clone.borrow().save();
                                                 Self::set_btn_content(&b_syn_clone, "format-text-code-symbolic", l.tr("syntax_kumir"));
+                                                let _ = bv_inner.sync_from_kumir(&code);
                                             }
                                         }
 
@@ -685,6 +750,16 @@ impl AppWindow {
                 about.present(Some(&win));
             });
         }
+        {
+            let win = window.clone();
+            let pop = menu_popover.clone();
+            let lr = lang_ref.clone();
+            btn_menu_docs.connect_clicked(move |_| {
+                pop.popdown();
+                let lang = *lr.borrow();
+                DocsWindow::show(&win, lang);
+            });
+        }
 
         // HeaderBar assembly: Primary controls only
         let header = adw::HeaderBar::new();
@@ -780,13 +855,66 @@ impl AppWindow {
         right_box.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
         right_box.append(&console_view.container);
 
-        // Split Paned: Editor on left, Field + Console on right
+        // Left Side: Mode Switcher (KuMir Code vs Scratch Blocks) + Stack
+        let left_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        left_box.set_vexpand(true);
+        left_box.set_hexpand(true);
+
+        let editor_mode_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        editor_mode_box.set_margin_start(8);
+        editor_mode_box.set_margin_end(8);
+        editor_mode_box.set_margin_top(4);
+        editor_mode_box.set_margin_bottom(4);
+        editor_mode_box.append(&btn_mode_text);
+        editor_mode_box.append(&btn_mode_blocks);
+
+        let editor_stack = gtk::Stack::new();
+        editor_stack.set_transition_type(gtk::StackTransitionType::Crossfade);
+        editor_stack.set_transition_duration(120);
+        editor_stack.set_vexpand(true);
+        editor_stack.set_hexpand(true);
+        editor_stack.add_named(&editor_view.container, Some("text"));
+        editor_stack.add_named(&blocks_view.container, Some("blocks"));
+        editor_stack.set_visible_child_name("text");
+
+        left_box.append(&editor_mode_box);
+        left_box.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+        left_box.append(&editor_stack);
+
+        // Split Paned: Left (Editor / Scratch Blocks) on left, Field + Console on right
         let paned = gtk::Paned::new(gtk::Orientation::Horizontal);
-        paned.set_start_child(Some(&editor_view.container));
+        paned.set_start_child(Some(&left_box));
         paned.set_end_child(Some(&right_box));
-        paned.set_position(550);
+        paned.set_position(580);
         paned.set_shrink_start_child(false);
         paned.set_shrink_end_child(false);
+
+        // Mode Switcher Connections
+        {
+            let stack = editor_stack.clone();
+            btn_mode_text.connect_toggled(move |btn| {
+                if btn.is_active() {
+                    stack.set_visible_child_name("text");
+                }
+            });
+        }
+        {
+            let stack = editor_stack.clone();
+            let bv = blocks_view.clone();
+            let ev = editor_view.clone();
+            btn_mode_blocks.connect_toggled(move |btn| {
+                if btn.is_active() {
+                    let start = ev.buffer.start_iter();
+                    let end = ev.buffer.end_iter();
+                    let text = ev.buffer.text(&start, &end, false).to_string();
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() && (trimmed.contains("алг") || trimmed.contains("вправо") || trimmed.contains("нц")) {
+                        let _ = bv.sync_from_kumir(&text);
+                    }
+                    stack.set_visible_child_name("blocks");
+                }
+            });
+        }
 
         // Bottom status bar
         let status_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -818,6 +946,10 @@ impl AppWindow {
             let lbl_field_ref = lbl_field.clone();
             let tw = title_widget.clone();
             let stat = status_label.clone();
+            let ev_robot = editor_view.clone();
+            let b_syn_robot = btn_menu_syntax.clone();
+            let lr_robot = lang_ref.clone();
+            let b_m_blocks_robot = btn_mode_blocks.clone();
 
             btn_performer_robot.connect_toggled(move |btn| {
                 if btn.is_active() {
@@ -829,8 +961,21 @@ impl AppWindow {
                     btn_size_15_ref.set_visible(true);
                     btn_size_20_ref.set_visible(true);
                     lbl_field_ref.set_visible(true);
+                    b_m_blocks_robot.set_sensitive(true);
                     tw.set_subtitle("КуМир Робот");
                     stat.set_text("Исполнитель: Робот");
+
+                    let start = ev_robot.buffer.start_iter();
+                    let end = ev_robot.buffer.end_iter();
+                    let current_text = ev_robot.buffer.text(&start, &end, false).to_string();
+                    let trimmed = current_text.trim();
+                    if trimmed.is_empty() || trimmed.starts_with("# Черепаха") {
+                        let lang = *lr_robot.borrow();
+                        ev_robot.set_syntax_mode(SyntaxMode::Kumir);
+                        Self::set_btn_content(&b_syn_robot, "format-text-code-symbolic", lang.tr("syntax_kumir"));
+                        ev_robot.buffer.set_text("алг\nнач\n  \nкон");
+                        ev_robot.rehighlight();
+                    }
                 }
             });
         }
@@ -846,6 +991,11 @@ impl AppWindow {
             let tw = title_widget.clone();
             let stat = status_label.clone();
             let turtle_view_ref = turtle_view.clone();
+            let b_syn_turtle = btn_menu_syntax.clone();
+            let lr_turtle = lang_ref.clone();
+            let b_m_text_turtle = btn_mode_text.clone();
+            let b_m_blocks_turtle = btn_mode_blocks.clone();
+            let e_stack_turtle = editor_stack.clone();
 
             btn_performer_turtle.connect_toggled(move |btn| {
                 if btn.is_active() {
@@ -860,26 +1010,29 @@ impl AppWindow {
                     tw.set_subtitle("Черепаха");
                     stat.set_text("Исполнитель: Черепаха");
 
+                    // For Turtle, activate text code mode and disable blocks
+                    b_m_text_turtle.set_active(true);
+                    e_stack_turtle.set_visible_child_name("text");
+                    b_m_blocks_turtle.set_sensitive(false);
+
+                    // Switch syntax mode to Python for Turtle
+                    let lang = *lr_turtle.borrow();
+                    ev.set_syntax_mode(SyntaxMode::Python);
+                    Self::set_btn_content(&b_syn_turtle, "format-text-code-symbolic", lang.tr("syntax_python"));
+
                     // Insert boilerplate template into editor if editor is empty or still has default KuMir stub
                     let start = ev.buffer.start_iter();
                     let end = ev.buffer.end_iter();
                     let current_text = ev.buffer.text(&start, &end, false).to_string();
                     let trimmed = current_text.trim();
                     let is_blank_or_default = trimmed.is_empty()
-                        || trimmed == "алг
-нач
-кон"
-                        || trimmed == "алг
-нач
-кон"
-                        || trimmed.starts_with("алг
-нач
-  | Напишите");
+                        || trimmed == "алг\nнач\nкон"
+                        || trimmed == "алг\nнач\n  \nкон"
+                        || trimmed.starts_with("алг\nнач\n  | Напишите")
+                        || trimmed.starts_with("# Черепаха");
 
                     if is_blank_or_default {
-                        // Choose boilerplate based on current syntax mode
-                        let template = if ev.syntax_mode() == crate::ui::editor_view::SyntaxMode::Python {
-                            r#"# Черепаха: программа на Python
+                        let template = r#"# Черепаха: программа на Python
 # Доступные команды:
 #   вперёд(шаги) / forward(steps)
 #   назад(шаги) / backward(steps)
@@ -894,16 +1047,7 @@ impl AppWindow {
 for _ in range(4):
     вперёд(100)
     вправо(90)
-"#
-                        } else {
-                            r#"алг
-нач
-  | Напишите программу для Черепахи
-  | Команды: вперёд(N), назад(N), влево(N), вправо(N)
-  |          опустить хвост, поднять хвост, сброс
-  иcп Черепаха
-кон"#
-                        };
+"#;
                         ev.buffer.set_text(template);
                         ev.rehighlight();
                     }
@@ -956,15 +1100,24 @@ for _ in range(4):
             let stat = status_label.clone();
             let fv = field_view.clone();
             let tv = turtle_view.clone();
+            let b_perf_turtle_run = btn_performer_turtle.clone();
+            let b_syn_run = btn_menu_syntax.clone();
 
             btn_run.connect_clicked(move |_| {
                 let lang = *lr.borrow();
                 let cur_syntax = ev_ref.syntax_mode();
+                let is_turtle_active = b_perf_turtle_run.is_active();
+                let should_run_python = cur_syntax == SyntaxMode::Python || is_turtle_active;
+
+                if is_turtle_active && cur_syntax != SyntaxMode::Python {
+                    ev_ref.set_syntax_mode(SyntaxMode::Python);
+                    Self::set_btn_content(&b_syn_run, "format-text-code-symbolic", lang.tr("syntax_python"));
+                }
 
                 // -----------------------------------------------------------
                 // Python Execution Mode
                 // -----------------------------------------------------------
-                if cur_syntax == SyntaxMode::Python {
+                if should_run_python {
                     let mut running = is_r.borrow_mut();
                     if *running {
                         *running = false;
@@ -1014,16 +1167,23 @@ def _turtle(cmd, **kw):
     payload = {{"cmd": cmd}}
     payload.update(kw)
     return _send(payload)
-def вперёд(n): return _turtle("turtle_forward", dist=n)
-def назад(n): return _turtle("turtle_backward", dist=n)
-def влево(n): return _turtle("turtle_left", angle=n)
-def вправо(n): return _turtle("turtle_right", angle=n)
+def вперёд(n=50): return _turtle("turtle_forward", dist=n)
+def назад(n=50): return _turtle("turtle_backward", dist=n)
+def влево(n=90): return _turtle("turtle_left", angle=n)
+def вправо(n=90): return _turtle("turtle_right", angle=n)
 def опустить_хвост(): return _turtle("turtle_pen_down")
 def поднять_хвост(): return _turtle("turtle_pen_up")
 def очистить_холст(): return _turtle("turtle_clear")
 def домой(): return _turtle("turtle_reset")
-forward = вперёд; backward = назад; turn_left = влево; turn_right = вправо
-pen_down = опустить_хвост; pen_up = поднять_хвост; clear = очистить_холст; home = домой
+
+forward = вперед = вперёд
+backward = назад
+turn_left = налево = влево
+turn_right = направо = вправо
+pen_down = опусти_хвост = опустить_хвост
+pen_up = подними_хвост = поднять_хвост
+clear = очистить = очистить_холст
+home = сброс_черепахи = домой
 
 {}
 "#, py_code);
@@ -1171,8 +1331,14 @@ pen_down = опустить_хвост; pen_up = поднять_хвост; clea
             let save_fn = do_save_fn.clone();
             let r_fn = do_reset_fn.clone();
             let back_fn = do_step_back_fn.clone();
+            let win_f1 = window.clone();
+            let lr_f1 = lang_ref.clone();
 
             key_controller.connect_key_pressed(move |_, keyval, _keycode, state| {
+                if keyval == gdk::Key::F1 {
+                    DocsWindow::show(&win_f1, *lr_f1.borrow());
+                    return glib::Propagation::Stop;
+                }
                 let cfg = kb_cfg.borrow();
                 if cfg.run.matches(keyval, state) {
                     b_run.emit_clicked();

@@ -1,5 +1,7 @@
 pub mod app_window;
+pub mod blocks_view;
 pub mod console_view;
+pub mod docs_window;
 pub mod editor_view;
 pub mod field_view;
 pub mod i18n;
@@ -11,7 +13,12 @@ pub mod vim_mode;
 
 pub use app_window::AppWindow;
 #[allow(unused_imports)]
+pub use blocks_view::BlocksView;
+#[allow(unused_imports)]
+pub use docs_window::DocsWindow;
+#[allow(unused_imports)]
 pub use editor_view::SyntaxMode;
 #[allow(unused_imports)]
 pub use i18n::Language;
+#[allow(unused_imports)]
 pub use turtle_view::{TurtleState, TurtleView};

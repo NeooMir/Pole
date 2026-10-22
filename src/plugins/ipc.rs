@@ -281,7 +281,7 @@ impl IpcServer {
                 status.set_text(&msg);
                 format!(r#"{{"status":"ok","x":{:.1},"y":{:.1},"angle":{:.1}}}"#, t.x, t.y, t.angle)
             }
-            "turtle_left" | "turn_left" | "влево" | "налево" => {
+            "turtle_left" | "turn_left" | "влево" | "налево" | "поворот_влево" => {
                 let deg = extract_cmd_num(cmd, "angle")
                     .or_else(|| extract_cmd_num(cmd, "deg"))
                     .unwrap_or(90.0);
@@ -293,7 +293,7 @@ impl IpcServer {
                 status.set_text(&msg);
                 format!(r#"{{"status":"ok","angle":{:.1}}}"#, t.angle)
             }
-            "turtle_right" | "turn_right" | "вправо" | "направо" => {
+            "turtle_right" | "turn_right" | "вправо" | "направо" | "поворот_вправо" => {
                 let deg = extract_cmd_num(cmd, "angle")
                     .or_else(|| extract_cmd_num(cmd, "deg"))
                     .unwrap_or(90.0);
@@ -305,7 +305,7 @@ impl IpcServer {
                 status.set_text(&msg);
                 format!(r#"{{"status":"ok","angle":{:.1}}}"#, t.angle)
             }
-            "turtle_pen_down" | "pen_down" | "опустить_хвост" | "опусти_хвост" => {
+            "turtle_pen_down" | "pen_down" | "опустить_хвост" | "опусти_хвост" | "перо_вниз" => {
                 let mut t = turtle.borrow_mut();
                 t.set_pen(true);
                 turtle_view.widget.queue_draw();
@@ -314,7 +314,7 @@ impl IpcServer {
                 status.set_text(msg);
                 r#"{"status":"ok","pen":true}"#.to_string()
             }
-            "turtle_pen_up" | "pen_up" | "поднять_хвост" | "подними_хвост" => {
+            "turtle_pen_up" | "pen_up" | "поднять_хвост" | "подними_хвост" | "перо_вверх" => {
                 let mut t = turtle.borrow_mut();
                 t.set_pen(false);
                 turtle_view.widget.queue_draw();
@@ -323,7 +323,7 @@ impl IpcServer {
                 status.set_text(msg);
                 r#"{"status":"ok","pen":false}"#.to_string()
             }
-            "turtle_clear" | "clear" | "очистить_холст" => {
+            "turtle_clear" | "clear" | "очистить_холст" | "очистить" => {
                 let mut t = turtle.borrow_mut();
                 t.clear();
                 turtle_view.widget.queue_draw();
@@ -332,7 +332,7 @@ impl IpcServer {
                 status.set_text(msg);
                 r#"{"status":"ok"}"#.to_string()
             }
-            "turtle_reset" | "домой" | "home" => {
+            "turtle_reset" | "домой" | "home" | "сброс_черепахи" => {
                 let mut t = turtle.borrow_mut();
                 t.reset();
                 turtle_view.widget.queue_draw();
@@ -340,6 +340,22 @@ impl IpcServer {
                 console.log_action(msg);
                 status.set_text(msg);
                 r#"{"status":"ok"}"#.to_string()
+            }
+            "turtle_step_back" | "turtle_back" | "step_back_turtle" => {
+                let mut t = turtle.borrow_mut();
+                let ok = t.step_back();
+                turtle_view.widget.queue_draw();
+                if ok {
+                    let msg = format!("Черепаха: шаг назад, поз: ({:.0}, {:.0})", t.x, t.y);
+                    console.log_action(&msg);
+                    status.set_text(&msg);
+                    format!(r#"{{"status":"ok","x":{:.1},"y":{:.1},"angle":{:.1}}}"#, t.x, t.y, t.angle)
+                } else {
+                    let msg = "Черепаха уже в начальной точке".to_string();
+                    console.log_action(&msg);
+                    status.set_text(&msg);
+                    r#"{"status":"ok","message":"already_at_start"}"#.to_string()
+                }
             }
             "turtle_status" => {
                 let t = turtle.borrow();

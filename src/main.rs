@@ -1,6 +1,3 @@
-// NeoMir - Educational Programming Environment (KuMir language)
-// Main entry point
-
 mod lang;
 mod plugins;
 mod robot;
@@ -266,5 +263,268 @@ mod tests {
         assert_eq!(SyntaxMode::from_str("unknown"), SyntaxMode::Kumir);
         assert_eq!(SyntaxMode::Kumir.as_str(), "kumir");
         assert_eq!(SyntaxMode::Python.as_str(), "python");
+    }
+
+    #[test]
+    fn test_scratch_blocks_to_kumir_and_execution() {
+        use crate::ui::blocks_view::{generate_kumir, Block, BlockKind, ConditionKind};
+        let blocks = vec![
+            Block { id: 1, kind: BlockKind::MoveRight },
+            Block { id: 2, kind: BlockKind::Paint },
+            Block {
+                id: 3,
+                kind: BlockKind::RepeatTimes {
+                    times: 2,
+                    body: vec![
+                        Block { id: 4, kind: BlockKind::MoveDown },
+                        Block { id: 5, kind: BlockKind::Paint },
+                    ],
+                },
+            },
+            Block {
+                id: 6,
+                kind: BlockKind::RepeatWhile {
+                    cond: ConditionKind::RightFree,
+                    body: vec![
+                        Block { id: 7, kind: BlockKind::MoveRight },
+                    ],
+                },
+            },
+            Block {
+                id: 8,
+                kind: BlockKind::If {
+                    cond: ConditionKind::CellClean,
+                    then_body: vec![
+                        Block { id: 9, kind: BlockKind::Paint },
+                    ],
+                },
+            },
+        ];
+
+        let code = generate_kumir(&blocks);
+        assert!(code.contains("использовать Робот"));
+        assert!(code.contains("алг"));
+        assert!(code.contains("нач"));
+        assert!(code.contains("вправо"));
+        assert!(code.contains("закрасить"));
+        assert!(code.contains("нц 2 раз"));
+        assert!(code.contains("нц пока справа свободно"));
+        assert!(code.contains("если клетка чистая то"));
+        assert!(code.contains("кц"));
+        assert!(code.contains("все"));
+        assert!(code.contains("кон"));
+
+        let mut vm = compile_source(&code).expect("Generated KuMir code must compile");
+        let mut field = RobotField::new(10, 10);
+        let mut steps = 0;
+        loop {
+            match vm.step(&mut field) {
+                StepResult::Finished => break,
+                StepResult::Error { message, .. } => panic!("VM step failed: {}", message),
+                _ => {}
+            }
+            steps += 1;
+            assert!(steps < 200, "Too many steps");
+        }
+
+        assert_eq!(field.robot_y, 2);
+        assert_eq!(field.robot_x, 9);
+        assert!(field.painted[2][9]);
+    }
+
+    #[test]
+    fn test_scratch_kumir_to_blocks_roundtrip() {
+        use crate::ui::blocks_view::{generate_kumir, parse_kumir_to_blocks, BlockKind};
+        let src = r#"использовать Робот
+алг
+нач
+    вправо
+    закрасить
+    нц 3 раз
+        вниз
+        закрасить
+    кц
+    нц пока справа свободно
+        вправо
+    кц
+кон
+"#;
+        let mut nid = 0;
+        let blocks = parse_kumir_to_blocks(src, &mut nid).expect("Should parse into blocks");
+        assert_eq!(blocks.len(), 4);
+        assert_eq!(blocks[0].kind, BlockKind::MoveRight);
+        assert_eq!(blocks[1].kind, BlockKind::Paint);
+        match &blocks[2].kind {
+            BlockKind::RepeatTimes { times, body } => {
+                assert_eq!(*times, 3);
+                assert_eq!(body.len(), 2);
+            }
+            _ => panic!("Expected RepeatTimes block"),
+        }
+        match &blocks[3].kind {
+            BlockKind::RepeatWhile { cond, body } => {
+                assert_eq!(*cond, crate::ui::blocks_view::ConditionKind::RightFree);
+                assert_eq!(body.len(), 1);
+            }
+            _ => panic!("Expected RepeatWhile block"),
+        }
+
+        let gen_code = generate_kumir(&blocks);
+        let vm = compile_source(&gen_code).expect("Roundtripped code must compile");
+        assert!(!vm.instructions.is_empty());
+    }
+
+    #[test]
+    fn test_scratch_presets_compilation_and_execution() {
+        use crate::ui::blocks_view::{generate_kumir, Block, BlockKind, ConditionKind};
+
+        let presets = vec![
+            // FirstSteps
+            vec![
+                Block { id: 1, kind: BlockKind::MoveRight },
+                Block { id: 2, kind: BlockKind::Paint },
+                Block { id: 3, kind: BlockKind::MoveRight },
+                Block { id: 4, kind: BlockKind::Paint },
+                Block { id: 5, kind: BlockKind::MoveDown },
+                Block { id: 6, kind: BlockKind::Paint },
+            ],
+            // Square
+            vec![
+                Block {
+                    id: 1,
+                    kind: BlockKind::RepeatTimes {
+                        times: 3,
+                        body: vec![Block { id: 2, kind: BlockKind::MoveRight }, Block { id: 3, kind: BlockKind::Paint }],
+                    },
+                },
+                Block {
+                    id: 4,
+                    kind: BlockKind::RepeatTimes {
+                        times: 3,
+                        body: vec![Block { id: 5, kind: BlockKind::MoveDown }, Block { id: 6, kind: BlockKind::Paint }],
+                    },
+                },
+            ],
+            // Stairs
+            vec![Block {
+                id: 1,
+                kind: BlockKind::RepeatTimes {
+                    times: 4,
+                    body: vec![
+                        Block { id: 2, kind: BlockKind::MoveRight },
+                        Block { id: 3, kind: BlockKind::Paint },
+                        Block { id: 4, kind: BlockKind::MoveDown },
+                        Block { id: 5, kind: BlockKind::Paint },
+                    ],
+                },
+            }],
+            // Snake
+            vec![Block {
+                id: 1,
+                kind: BlockKind::RepeatWhile {
+                    cond: ConditionKind::RightFree,
+                    body: vec![Block { id: 2, kind: BlockKind::MoveRight }, Block { id: 3, kind: BlockKind::Paint }],
+                },
+            }],
+        ];
+
+        for blocks in presets {
+            let code = generate_kumir(&blocks);
+            let mut vm = compile_source(&code).expect("Preset must compile to valid KuMir VM");
+            let mut field = RobotField::new(10, 10);
+            let mut steps = 0;
+            loop {
+                match vm.step(&mut field) {
+                    StepResult::Finished => break,
+                    StepResult::Error { message, .. } => panic!("Execution error: {}", message),
+                    _ => {}
+                }
+                steps += 1;
+                assert!(steps < 200, "Overrun");
+            }
+        }
+    }
+    #[test]
+    fn test_turtle_state_operations_and_step_back() {
+        use crate::ui::turtle_view::TurtleState;
+        let mut t = TurtleState::new();
+        assert_eq!(t.x, 0.0);
+        assert_eq!(t.y, 0.0);
+        assert_eq!(t.angle, 90.0);
+        assert!(t.pen_down);
+        assert!(t.lines.is_empty());
+
+        // Move forward 100 units (upwards since angle is 90)
+        t.forward(100.0);
+        assert!((t.x - 0.0).abs() < 1e-4);
+        assert!((t.y - 100.0).abs() < 1e-4);
+        assert_eq!(t.lines.len(), 1);
+
+        // Turn right 90 degrees -> angle 0 (facing east / right)
+        t.turn_right(90.0);
+        assert!((t.angle - 0.0).abs() < 1e-4);
+
+        // Move forward 50 units
+        t.forward(50.0);
+        assert!((t.x - 50.0).abs() < 1e-4);
+        assert!((t.y - 100.0).abs() < 1e-4);
+        assert_eq!(t.lines.len(), 2);
+
+        // Raise pen and move
+        t.set_pen(false);
+        t.forward(30.0);
+        assert_eq!(t.lines.len(), 2); // No new line when pen is up
+
+        // Test step back
+        assert!(t.step_back()); // undo forward(30.0)
+        assert!((t.x - 50.0).abs() < 1e-4);
+
+        assert!(t.step_back()); // undo set_pen(false)
+        assert!(t.pen_down);
+
+        assert!(t.step_back()); // undo forward(50.0)
+        assert!((t.x - 0.0).abs() < 1e-4);
+        assert_eq!(t.lines.len(), 1);
+
+        // Test reset
+        t.reset();
+        assert_eq!(t.x, 0.0);
+        assert_eq!(t.y, 0.0);
+        assert_eq!(t.angle, 90.0);
+        assert!(t.pen_down);
+        assert!(t.lines.is_empty());
+        assert!(!t.step_back()); // No history after reset
+    }
+
+    #[test]
+    fn test_docs_window_and_i18n_integrity() {
+        use crate::ui::i18n::Language;
+        let ru = Language::Ru;
+        let en = Language::En;
+
+        // Check documentation titles and menu keys
+        assert_eq!(ru.tr("menu_docs"), "Документация");
+        assert_eq!(en.tr("menu_docs"), "Documentation");
+
+        // Verify keys do not contain emojis or forbidden parenthesized suffixes
+        let checked_keys = [
+            "run", "step", "reset", "menu_docs", "menu_load", "menu_save",
+            "syntax_kumir", "syntax_python", "mode_text", "mode_blocks",
+            "scratch_title", "scratch_motion", "scratch_control",
+        ];
+
+        for key in &checked_keys {
+            let val_ru = ru.tr(key);
+            let val_en = en.tr(key);
+            assert!(!val_ru.contains("(Scratch)"), "Must not contain (Scratch)");
+            assert!(!val_ru.contains("(КуМир)"), "Must not contain (КуМир)");
+            assert!(!val_en.contains("(Scratch)"), "Must not contain (Scratch)");
+            // Ensure no emojis in UI labels
+            for ch in val_ru.chars().chain(val_en.chars()) {
+                let code = ch as u32;
+                let is_emoji = (0x1F300..=0x1F9FF).contains(&code) || (0x2600..=0x26FF).contains(&code);
+                assert!(!is_emoji, "Found forbidden emoji in translation key {}: {}", key, ch);
+            }
+        }
     }
 }
