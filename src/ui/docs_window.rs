@@ -64,10 +64,11 @@ impl DocsWindow {
             );
         }
 
-        // Add 5 comprehensive documentation pages
+        // Add 6 comprehensive documentation pages
         window.add(&Self::build_kumir_page(is_en));
         window.add(&Self::build_robot_page(is_en));
         window.add(&Self::build_turtle_page(is_en));
+        window.add(&Self::build_python_api_page(is_en));
         window.add(&Self::build_blocks_page(is_en));
         window.add(&Self::build_shortcuts_page(is_en));
 
@@ -600,6 +601,199 @@ impl DocsWindow {
                 "Python",
                 "# Рисуем правильную пятиконечную звезду:\nfor _ in range(5):\n    вперёд(140)\n    вправо(144)",
                 "<span foreground=\"#77767b\" style=\"italic\"># Рисуем правильную пятиконечную звезду:</span>\n<span foreground=\"#e66100\" weight=\"bold\">for</span> _ <span foreground=\"#e66100\" weight=\"bold\">in</span> range(<span foreground=\"#c061cb\">5</span>):\n    вперёд(<span foreground=\"#c061cb\">140</span>)\n    вправо(<span foreground=\"#c061cb\">144</span>)",
+                "Копировать пример в буфер",
+            ));
+            page.add(&grp_examples);
+        }
+
+        page
+    }
+
+    fn build_python_api_page(is_en: bool) -> adw::PreferencesPage {
+        let page = adw::PreferencesPage::new();
+        page.set_title(if is_en { "PyPole API" } else { "PyPole API" });
+        page.set_icon_name(Some("applications-development-symbolic"));
+        page.set_name(Some("python_api"));
+
+        if is_en {
+            let grp_ide = adw::PreferencesGroup::new();
+            grp_ide.set_title("PyCharm & IDE Integration");
+            grp_ide.set_description(Some("Connect external Python IDEs and scripts directly to the Pole environment"));
+
+            grp_ide.add(&Self::create_cmd_row(
+                "Package Installation",
+                "Run <b>pip install -e ./python</b> in terminal or open the Pole repository in PyCharm",
+            ));
+            grp_ide.add(&Self::create_cmd_row(
+                "Automatic IPC Socket Discovery",
+                "The library automatically discovers and connects to the active Pole socket (neomir.sock / pole.sock)",
+            ));
+            grp_ide.add(&Self::create_cmd_row(
+                "Real-time Output in PyCharm Console",
+                "Calling performer methods prints immediate state and sensor diagnostics directly to the PyCharm Run window",
+            ));
+            grp_ide.add(&Self::create_cmd_row(
+                "Embedded & Isolated Python Runtime",
+                "Pole features an isolated execution engine (PYTHONNOUSERSITE=1) with bundled libraries, ensuring zero dependency on host OS Python packages",
+            ));
+            page.add(&grp_ide);
+
+            let grp_robot = adw::PreferencesGroup::new();
+            grp_robot.set_title("Robot API Reference");
+            grp_robot.set_description(Some("Methods available on the robot instance"));
+
+            grp_robot.add(&Self::create_cmd_row(
+                "robot.right(n), left(n), up(n), down(n)",
+                "Move robot by n steps in the specified direction",
+            ));
+            grp_robot.add(&Self::create_cmd_row(
+                "robot.paint(), reset(), step_back()",
+                "Paint current cell, return to start position, or undo last action",
+            ));
+            grp_robot.add(&Self::create_cmd_row(
+                "robot.wall_up(), wall_down(), wall_left(), wall_right()",
+                "Return True if there is an adjacent wall",
+            ));
+            grp_robot.add(&Self::create_cmd_row(
+                "robot.free_up(), free_down(), free_left(), free_right()",
+                "Return True if the corresponding direction is free of walls",
+            ));
+            grp_robot.add(&Self::create_cmd_row(
+                "robot.is_painted(), is_clean()",
+                "Check whether the current cell is painted or clean",
+            ));
+            page.add(&grp_robot);
+
+            let grp_turtle = adw::PreferencesGroup::new();
+            grp_turtle.set_title("Turtle API Reference");
+            grp_turtle.set_description(Some("Methods available on the turtle instance"));
+
+            grp_turtle.add(&Self::create_cmd_row(
+                "turtle.forward(dist), backward(dist)",
+                "Move turtle forward or backward along its current heading",
+            ));
+            grp_turtle.add(&Self::create_cmd_row(
+                "turtle.left(angle), right(angle)",
+                "Turn turtle counter-clockwise or clockwise by angle degrees",
+            ));
+            grp_turtle.add(&Self::create_cmd_row(
+                "turtle.pen_down(), pen_up()",
+                "Lower pen to draw trails, or raise pen to move without drawing",
+            ));
+            grp_turtle.add(&Self::create_cmd_row(
+                "turtle.home(), clear(), step_back()",
+                "Reset position to origin (0, 0), clear canvas, or undo last step",
+            ));
+            page.add(&grp_turtle);
+
+            let grp_examples = adw::PreferencesGroup::new();
+            grp_examples.set_title("PyCharm Code Examples");
+            grp_examples.set_description(Some("Ready-to-run Python scripts with real-time PyCharm console output"));
+
+            grp_examples.add(&Self::create_code_card(
+                "PyCharm Robot Script",
+                "Python",
+                "from pypole import robot\n\n# Move and paint corridor with live output in PyCharm console\nrobot.reset()\nwhile robot.free_right():\n    robot.right()\n    robot.paint()\n\nprint('Corridor painted successfully!')",
+                "<span foreground=\"#e66100\" weight=\"bold\">from</span> pole <span foreground=\"#e66100\" weight=\"bold\">import</span> robot\n\n<span foreground=\"#77767b\" style=\"italic\"># Move and paint corridor with live output in PyCharm console</span>\nrobot.reset()\n<span foreground=\"#e66100\" weight=\"bold\">while</span> robot.free_right():\n    robot.right()\n    robot.paint()\n\nprint(<span foreground=\"#26a269\">'Corridor painted successfully!'</span>)",
+                "Copy code example",
+            ));
+
+            grp_examples.add(&Self::create_code_card(
+                "PyCharm Turtle Script",
+                "Python",
+                "from pypole import turtle\n\n# Draw a polygon with live status updates\nturtle.home()\nturtle.clear()\nfor _ in range(6):\n    turtle.forward(80)\n    turtle.right(60)\n\nprint('Hexagon drawn!')",
+                "<span foreground=\"#e66100\" weight=\"bold\">from</span> pole <span foreground=\"#e66100\" weight=\"bold\">import</span> turtle\n\n<span foreground=\"#77767b\" style=\"italic\"># Draw a polygon with live status updates</span>\nturtle.home()\nturtle.clear()\n<span foreground=\"#e66100\" weight=\"bold\">for</span> _ <span foreground=\"#e66100\" weight=\"bold\">in</span> range(<span foreground=\"#c061cb\">6</span>):\n    turtle.forward(<span foreground=\"#c061cb\">80</span>)\n    turtle.right(<span foreground=\"#c061cb\">60</span>)\n\nprint(<span foreground=\"#26a269\">'Hexagon drawn!'</span>)",
+                "Copy code example",
+            ));
+            page.add(&grp_examples);
+        } else {
+            let grp_ide = adw::PreferencesGroup::new();
+            grp_ide.set_title("Подключение к PyCharm и внешним IDE");
+            grp_ide.set_description(Some("Управление средой Pole напрямую из ваших любимых редакторов кода на Python"));
+
+            grp_ide.add(&Self::create_cmd_row(
+                "Установка библиотеки PyPole",
+                "Выполните <b>pip install -e ./python</b> в терминале или откройте проект Pole в PyCharm",
+            ));
+            grp_ide.add(&Self::create_cmd_row(
+                "Автоматическое обнаружение сокета",
+                "Клиент автоматически находит активный сокет среды Pole (neomir.sock / pole.sock) в системе",
+            ));
+            grp_ide.add(&Self::create_cmd_row(
+                "Вывод результатов в консоль PyCharm",
+                "Каждый шаг и сенсорные данные мгновенно форматируются и выводятся прямо в окно выполнения вашей IDE",
+            ));
+            grp_ide.add(&Self::create_cmd_row(
+                "Встроенный и изолированный Python",
+                "Pole использует изолированное окружение (PYTHONNOUSERSITE=1) со встроенной библиотекой pypole, не зависящее от установленных в ОС пакетов",
+            ));
+            page.add(&grp_ide);
+
+            let grp_robot = adw::PreferencesGroup::new();
+            grp_robot.set_title("Методы исполнителя Робот");
+            grp_robot.set_description(Some("Доступны как на русском, так и на английском языке"));
+
+            grp_robot.add(&Self::create_cmd_row(
+                "робот.вправо(n), влево(n), вверх(n), вниз(n)",
+                "Шаг в указанном направлении на n клеток (по умолчанию 1)",
+            ));
+            grp_robot.add(&Self::create_cmd_row(
+                "робот.закрасить(), сброс(), шаг_назад()",
+                "Закрасить клетку, вернуть в начало или отменить последний ход",
+            ));
+            grp_robot.add(&Self::create_cmd_row(
+                "робот.сверху_стена(), снизу_стена(), слева_стена(), справа_стена()",
+                "Датчики стен (возвращают True при наличии стены)",
+            ));
+            grp_robot.add(&Self::create_cmd_row(
+                "робот.сверху_свободно(), снизу_свободно(), слева_свободно(), справа_свободно()",
+                "Проверка свободного пути для циклов «пока» и условий «если»",
+            ));
+            grp_robot.add(&Self::create_cmd_row(
+                "робот.клетка_закрашена(), клетка_чистая()",
+                "Проверка статуса текущей клетки поля",
+            ));
+            page.add(&grp_robot);
+
+            let grp_turtle = adw::PreferencesGroup::new();
+            grp_turtle.set_title("Методы исполнителя Черепаха");
+            grp_turtle.set_description(Some("Команды векторного рисования и навигации"));
+
+            grp_turtle.add(&Self::create_cmd_row(
+                "черепаха.вперёд(дист), назад(дист)",
+                "Движение вдоль направления взгляда (forward / backward)",
+            ));
+            grp_turtle.add(&Self::create_cmd_row(
+                "черепаха.влево(угол), вправо(угол)",
+                "Поворот на угол в градусах (left / right)",
+            ));
+            grp_turtle.add(&Self::create_cmd_row(
+                "черепаха.опустить_хвост(), поднять_хвост()",
+                "Управление рисованием: с пером или без следа (pen_down / pen_up)",
+            ));
+            grp_turtle.add(&Self::create_cmd_row(
+                "черепаха.домой(), очистить(), шаг_назад()",
+                "Возврат в центр (0, 0), очистка холста или отмена шага",
+            ));
+            page.add(&grp_turtle);
+
+            let grp_examples = adw::PreferencesGroup::new();
+            grp_examples.set_title("Примеры программ для запуска из PyCharm");
+            grp_examples.set_description(Some("Готовые скрипты с отображением выполнения в окне Pole и выводом в PyCharm"));
+
+            grp_examples.add(&Self::create_code_card(
+                "Управление Роботом из PyCharm",
+                "Python",
+                "from pypole import робот\n\n# Робот выполняет команды в Pole, а результат выводится в консоль PyCharm:\nробот.сброс()\nwhile робот.справа_свободно():\n    робот.вправо()\n    робот.закрасить()\n\nprint('Коридор успешно закрашен!')",
+                "<span foreground=\"#e66100\" weight=\"bold\">from</span> pole <span foreground=\"#e66100\" weight=\"bold\">import</span> робот\n\n<span foreground=\"#77767b\" style=\"italic\"># Робот выполняет команды в Pole, а результат выводится в консоль PyCharm:</span>\nробот.сброс()\n<span foreground=\"#e66100\" weight=\"bold\">while</span> робот.справа_свободно():\n    робот.вправо()\n    робот.закрасить()\n\nprint(<span foreground=\"#26a269\">'Коридор успешно закрашен!'</span>)",
+                "Копировать пример в буфер",
+            ));
+
+            grp_examples.add(&Self::create_code_card(
+                "Рисование Черепахой из PyCharm",
+                "Python",
+                "from pypole import черепаха\n\n# Рисование шестиугольника с выводом координат в консоль:\nчерепаха.домой()\nчерепаха.очистить()\nfor _ in range(6):\n    черепаха.вперёд(80)\n    черепаха.вправо(60)\n\nprint('Шестиугольник готов!')",
+                "<span foreground=\"#e66100\" weight=\"bold\">from</span> pole <span foreground=\"#e66100\" weight=\"bold\">import</span> черепаха\n\n<span foreground=\"#77767b\" style=\"italic\"># Рисование шестиугольника с выводом координат в консоль:</span>\nчерепаха.домой()\nчерепаха.очистить()\n<span foreground=\"#e66100\" weight=\"bold\">for</span> _ <span foreground=\"#e66100\" weight=\"bold\">in</span> range(<span foreground=\"#c061cb\">6</span>):\n    черепаха.вперёд(<span foreground=\"#c061cb\">80</span>)\n    черепаха.вправо(<span foreground=\"#c061cb\">60</span>)\n\nprint(<span foreground=\"#26a269\">'Шестиугольник готов!'</span>)",
                 "Копировать пример в буфер",
             ));
             page.add(&grp_examples);

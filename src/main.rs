@@ -527,4 +527,50 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn test_kumir_vm_marginalia_realtime_state() {
+        let code = r#"использовать Робот
+алг
+нач
+цел х
+х := 10 + 5
+вправо
+вывод "Привет"
+кон"#;
+        let mut vm = compile_source(code).expect("Should compile code");
+        let mut field = RobotField::new(10, 10);
+
+        loop {
+            match vm.step(&mut field) {
+                StepResult::Finished => break,
+                StepResult::Error { message, line } => panic!("Unexpected error at line {}: {}", line, message),
+                _ => {}
+            }
+        }
+
+        let m = vm.marginalia();
+        assert!(m.values().any(|v| v.contains("15") && v.contains("х")), "Marginalia should capture x = 15");
+        assert!(m.values().any(|v| v == "вправо"), "Marginalia should capture вправо");
+        assert!(m.values().any(|v| v.contains("Привет")), "Marginalia should capture print output");
+    }
+    #[test]
+    fn test_python_runtime_isolation_and_command_setup() {
+        use crate::lang::python_runtime::PythonRuntime;
+
+        let (interp, _) = PythonRuntime::find_interpreter();
+        assert!(!interp.to_string_lossy().is_empty());
+
+        let cmd = PythonRuntime::create_command();
+        let envs: Vec<_> = cmd.get_envs().collect();
+        assert!(envs.iter().any(|(k, v)| k.to_str() == Some("PYTHONNOUSERSITE") && v.and_then(|val| val.to_str()) == Some("1")),
+            "Command must isolate python from user OS packages (PYTHONNOUSERSITE=1)");
+        assert!(envs.iter().any(|(k, v)| k.to_str() == Some("PYTHONUNBUFFERED") && v.and_then(|val| val.to_str()) == Some("1")),
+            "Command must enable unbuffered stdout");
+        assert!(envs.iter().any(|(k, _v)| k.to_str() == Some("PYTHONPATH")),
+            "Command must inject isolated PYTHONPATH with pole library");
+
+        let wrapped = PythonRuntime::wrap_user_script("print('Hello from embedded Python')");
+        assert!(wrapped.contains("from pole import robot"), "Wrapped script must import pole");
+        assert!(wrapped.contains("print('Hello from embedded Python')"));
+    }
 }

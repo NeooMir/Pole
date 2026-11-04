@@ -23,7 +23,7 @@ Name:           neomir
 Version:        1.2
 Release:        1%{?dist}
 Summary:        NeoMir educational programming environment (KuMir / Robot)
-License:        GPL-2.0-or-later
+License:        MIT
 URL:            https://github.com/vptr/neomir
 
 AutoReqProv:    yes

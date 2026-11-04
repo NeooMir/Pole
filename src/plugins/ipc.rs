@@ -6,6 +6,7 @@ use gtk::glib;
 use gtk::prelude::*;
 use std::cell::RefCell;
 use std::io::{BufRead, BufReader, Write};
+#[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -23,10 +24,31 @@ struct IpcRequest {
 
 impl IpcServer {
     pub fn socket_path() -> PathBuf {
-        let base = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
-        PathBuf::from(base).join("neomir.sock")
+        #[cfg(unix)]
+        {
+            let base = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
+            PathBuf::from(base).join("neomir.sock")
+        }
+        #[cfg(not(unix))]
+        {
+            let base = std::env::var("TEMP").unwrap_or_else(|_| "C:\\Temp".to_string());
+            PathBuf::from(base).join("neomir.sock")
+        }
     }
 
+    #[cfg(not(unix))]
+    pub fn start(
+        _field: Rc<RefCell<RobotField>>,
+        _field_view: Rc<RobotFieldView>,
+        _turtle: Rc<RefCell<TurtleState>>,
+        _turtle_view: Rc<TurtleView>,
+        _console: Rc<ConsoleView>,
+        _status_label: gtk::Label,
+    ) {
+        // Windows IPC server stub
+    }
+
+    #[cfg(unix)]
     pub fn start(
         field: Rc<RefCell<RobotField>>,
         field_view: Rc<RobotFieldView>,
@@ -89,6 +111,7 @@ impl IpcServer {
         });
     }
 
+    #[cfg(unix)]
     fn handle_client(stream: UnixStream, ipc_tx: Sender<IpcRequest>) {
         let mut writer = match stream.try_clone() {
             Ok(s) => s,

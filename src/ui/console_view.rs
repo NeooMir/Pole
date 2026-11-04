@@ -224,47 +224,11 @@ impl ConsoleView {
             let (sender, receiver) = mpsc::channel::<(Option<String>, Option<String>)>();
 
             std::thread::spawn(move || {
-                let py_script = format!(r#"
-import os, sys, socket, json
+                let code_json = serde_json::to_string(&code).unwrap_or_else(|_| "\"\"".to_string());
+                let py_script = crate::lang::python_runtime::PythonRuntime::wrap_repl_code(&code_json);
 
-sock_path = os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/neomir.sock"
-client_sock = None
-try:
-    client_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    client_sock.connect(sock_path)
-except Exception:
-    client_sock = None
-
-def _send(payload):
-    if not client_sock:
-        return "NeoMir socket not connected"
-    if isinstance(payload, str):
-        data = json.dumps({{"cmd": payload}})
-    else:
-        data = json.dumps(payload)
-    client_sock.sendall((data + "\n").encode())
-    return client_sock.recv(4096).decode().strip()
-
-# Robot commands (Russian & English)
-вверх = up = lambda: _send("up")
-вниз = down = lambda: _send("down")
-влево = left = lambda: _send("left")
-вправо = right = lambda: _send("right")
-закрасить = paint = lambda: _send("paint")
-сброс = reset = lambda: _send("reset")
-
-
-
-code_input = {}
-try:
-    res = eval(compile(code_input, "<console>", "eval"))
-    if res is not None:
-        print(repr(res))
-except SyntaxError:
-    exec(compile(code_input, "<console>", "exec"))
-"#, serde_json::to_string(&code).unwrap_or_else(|_| "\"\"".to_string()));
-
-                let output = Command::new("python3")
+                let mut cmd = crate::lang::python_runtime::PythonRuntime::create_command();
+                let output = cmd
                     .arg("-c")
                     .arg(py_script)
                     .output();
@@ -385,11 +349,14 @@ except SyntaxError:
     }
 
     pub fn launch_external_python() {
+        let (py_bin, _) = crate::lang::python_runtime::PythonRuntime::find_interpreter();
+        let py_exec = py_bin.to_string_lossy().to_string();
+
         if std::env::var("FLATPAK_ID").is_ok() {
             let terminals = ["ptyxis", "gnome-terminal", "kgx", "xterm"];
             for term in &terminals {
                 if let Ok(_) = Command::new("flatpak-spawn")
-                    .args(["--host", term, "-e", "python3"])
+                    .args(["--host", term, "-e", &py_exec])
                     .spawn()
                 {
                     return;
@@ -407,11 +374,11 @@ except SyntaxError:
             "xterm",
         ];
         for term in &terminals {
-            if let Ok(_) = Command::new(term).arg("-e").arg("python3").spawn() {
+            if let Ok(_) = Command::new(term).arg("-e").arg(&py_exec).spawn() {
                 return;
             }
         }
-        let _ = Command::new("xdg-terminal-exec").arg("python3").spawn();
+        let _ = Command::new("xdg-terminal-exec").arg(&py_exec).spawn();
     }
 
     pub fn print_output(&self, text: &str) {

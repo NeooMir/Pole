@@ -1,0 +1,35 @@
+# Cargo Configuration: Windows builds always compile and link via Clang / LLVM
+
+[target.x86_64-pc-windows-gnu]
+linker = "clang"
+ar = "llvm-ar"
+rustflags = [
+    "-C", "linker=clang",
+    "-C", "link-arg=--target=x86_64-w64-windows-gnu",
+    "-C", "link-arg=-fuse-ld=lld",
+]
+
+[target.x86_64-pc-windows-msvc]
+linker = "clang-cl"
+ar = "llvm-lib"
+rustflags = [
+    "-C", "linker=clang-cl",
+    "-C", "link-arg=-fuse-ld=lld",
+]
+
+[target.i686-pc-windows-gnu]
+linker = "clang"
+ar = "llvm-ar"
+rustflags = [
+    "-C", "linker=clang",
+    "-C", "link-arg=--target=i686-w64-windows-gnu",
+    "-C", "link-arg=-fuse-ld=lld",
+]
+
+[target.i686-pc-windows-msvc]
+linker = "clang-cl"
+ar = "llvm-lib"
+rustflags = [
+    "-C", "linker=clang-cl",
+    "-C", "link-arg=-fuse-ld=lld",
+]

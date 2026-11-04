@@ -3,5 +3,6 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/flathub" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/python" vcs="Git" />
   </component>
 </project>

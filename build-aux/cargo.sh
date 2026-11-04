@@ -18,8 +18,8 @@ if [ -f "$SOURCE_ROOT/cargo/config.toml" ]; then
     CARGO_ARGS+=(--offline)
 elif [ -d "$SOURCE_ROOT/cargo-home" ]; then
     export CARGO_HOME="$SOURCE_ROOT/cargo-home"
-else
-    export CARGO_HOME="${CARGO_HOME:-$BUILD_ROOT/cargo-home}"
+elif [ -n "$CARGO_HOME" ]; then
+    export CARGO_HOME="$CARGO_HOME"
 fi
 
 if [ "$BUILDTYPE" = "release" ]; then
@@ -31,4 +31,8 @@ fi
 
 cargo build "${CARGO_ARGS[@]}"
 
-cp "$CARGO_TARGET_DIR/$BIN_DIR/$APP_BIN" "$OUTPUT"
+if [ -f "$CARGO_TARGET_DIR/$BIN_DIR/${APP_BIN}.exe" ]; then
+    cp "$CARGO_TARGET_DIR/$BIN_DIR/${APP_BIN}.exe" "$OUTPUT"
+else
+    cp "$CARGO_TARGET_DIR/$BIN_DIR/$APP_BIN" "$OUTPUT"
+fi

@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>io.github.NeooMir.Pole</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>GPL-2.0-or-later</project_license>
+  <project_license>MIT</project_license>
   <name>Pole</name>
   <name xml:lang="ru">Поле</name>
   <summary>Educational programming environment for KuMir with Robot performer</summary>
@@ -10,7 +10,7 @@
   <url type="homepage">https://github.com/NeooMir/Pole</url>
   <url type="bugtracker">https://github.com/NeooMir/Pole/issues</url>
   <url type="vcs-browser">https://github.com/NeooMir/Pole</url>
-  <developer id="io.github.NeooMir">
+  <developer id="io.github.neoomir">
     <name>Pole Contributors</name>
   </developer>
   <description>
@@ -41,8 +41,8 @@
     </release>
     <release version="0.1.0" date="2026-09-29">
       <description>
-        <p>Initial release under GNU GPLv2: Robot performer, KuMir language VM, syntax themes, and Vim mode.</p>
-        <p xml:lang="ru">Первый релиз под лицензией GNU GPLv2: исполнитель Робот, интерпретатор языка КуМир, темы оформления и Vim-режим.</p>
+        <p>Initial release: Robot performer, KuMir language VM, syntax themes, and Vim mode.</p>
+        <p xml:lang="ru">Первый релиз: исполнитель Робот, интерпретатор языка КуМир, темы оформления и Vim-режим.</p>
       </description>
     </release>
   </releases>

@@ -4,13 +4,18 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "============================================="
-echo " Сборка установочных пакетов NeoMir"
+echo " Сборка установочных пакетов Pole"
 echo "============================================="
 
 "$SCRIPT_DIR/build-rpm.sh"
 echo ""
 "$SCRIPT_DIR/build-deb.sh"
 echo ""
+
+if [ -f "$SCRIPT_DIR/build-windows.sh" ]; then
+    "$SCRIPT_DIR/build-windows.sh" || echo "Сборка Windows пропущена"
+    echo ""
+fi
 
 if command -v flatpak-builder &>/dev/null; then
     "$SCRIPT_DIR/build-flatpak.sh" || echo "Сборка Flatpak пропущена (требуется установленный GNOME Sdk)"

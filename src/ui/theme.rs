@@ -395,6 +395,11 @@ impl ThemeId {
                 background-color: {gbg};
                 color: {gfg};
             }}
+            textview.neomir-marginalia text, textview.neomir-marginalia {{
+                background-color: {gbg};
+                color: {cfg};
+                font-style: italic;
+            }}
             .vim-normal-badge {{
                 background-color: #26a269;
                 color: #ffffff;
@@ -414,6 +419,7 @@ impl ThemeId {
             fg = self.editor_fg(),
             gbg = self.gutter_bg(),
             gfg = self.gutter_fg(),
+            cfg = self.comment_color(),
         )
     }
 }

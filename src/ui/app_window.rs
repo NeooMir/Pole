@@ -414,6 +414,7 @@ impl AppWindow {
                 turtle_state_clone.borrow_mut().reset();
                 turtle_view_clone.widget.queue_draw();
                 ev_clone.highlight_line(None);
+                ev_clone.clear_marginalia();
                 stat_clone.set_text(lang.tr("status_ready"));
                 con_clone.print_info(lang.tr("field_reset_msg"));
             })
@@ -743,7 +744,7 @@ impl AppWindow {
                     .comments(lang.tr("about_comments"))
                     .website("https://github.com/NeooMir/Pole")
                     .issue_url("https://github.com/NeooMir/Pole/issues")
-                    .license_type(gtk::License::Gpl20)
+                    .license_type(gtk::License::MitX11)
                     .application_icon("io.github.NeooMir.Pole")
                     .copyright("© 2026 Pole")
                     .build();
@@ -1136,60 +1137,11 @@ for _ in range(4):
                     let py_code = ev_ref.buffer.text(&start, &end, false).to_string();
 
                     let (sender, receiver) = std::sync::mpsc::channel();
-                    let full_script = format!(r#"
-import socket, json, sys, os
-
-client_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-try:
-    sock_p = os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/neomir.sock"
-    client_sock.connect(sock_p)
-except Exception:
-    client_sock = None
-
-def _send(payload):
-    if not client_sock:
-        return "Socket not connected"
-    data = json.dumps({{"cmd": payload}}) if isinstance(payload, str) else json.dumps(payload)
-    client_sock.sendall((data + "\n").encode())
-    return client_sock.recv(4096).decode().strip()
-
-# Robot commands
-up = вверх = lambda: _send({{"cmd": "up"}})
-down = вниз = lambda: _send({{"cmd": "down"}})
-left = влево_робот = lambda: _send({{"cmd": "move_left"}})
-right = вправо_робот = lambda: _send({{"cmd": "move_right"}})
-paint = закрасить = lambda: _send({{"cmd": "paint"}})
-step_back = назад_робот = lambda: _send({{"cmd": "step_back"}})
-reset = сброс = lambda: _send({{"cmd": "reset"}})
-
-# Turtle commands
-def _turtle(cmd, **kw):
-    payload = {{"cmd": cmd}}
-    payload.update(kw)
-    return _send(payload)
-def вперёд(n=50): return _turtle("turtle_forward", dist=n)
-def назад(n=50): return _turtle("turtle_backward", dist=n)
-def влево(n=90): return _turtle("turtle_left", angle=n)
-def вправо(n=90): return _turtle("turtle_right", angle=n)
-def опустить_хвост(): return _turtle("turtle_pen_down")
-def поднять_хвост(): return _turtle("turtle_pen_up")
-def очистить_холст(): return _turtle("turtle_clear")
-def домой(): return _turtle("turtle_reset")
-
-forward = вперед = вперёд
-backward = назад
-turn_left = налево = влево
-turn_right = направо = вправо
-pen_down = опусти_хвост = опустить_хвост
-pen_up = подними_хвост = поднять_хвост
-clear = очистить = очистить_холст
-home = сброс_черепахи = домой
-
-{}
-"#, py_code);
+                    let full_script = crate::lang::python_runtime::PythonRuntime::wrap_user_script(&py_code);
 
                     thread::spawn(move || {
-                        let output = std::process::Command::new("python3")
+                        let mut cmd = crate::lang::python_runtime::PythonRuntime::create_command();
+                        let output = cmd
                             .arg("-c")
                             .arg(&full_script)
                             .output();
@@ -1418,6 +1370,7 @@ home = сброс_черепахи = домой
             vm_instance.step(&mut f)
         };
 
+        editor_view.update_marginalia(vm_instance.marginalia());
         field_view.widget.queue_draw();
 
         let prefix_step = if lang.is_en() { "Step" } else { "Шаг" };

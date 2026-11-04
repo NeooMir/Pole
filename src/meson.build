@@ -19,6 +19,9 @@ sources = files(
   'ui/theme.rs',
   'ui/i18n.rs',
   'ui/vim_mode.rs',
+  'ui/turtle_view.rs',
+  'ui/blocks_view.rs',
+  'ui/docs_window.rs',
 )
 
 cargo_script = meson.project_source_root() / 'build-aux' / 'cargo.sh'

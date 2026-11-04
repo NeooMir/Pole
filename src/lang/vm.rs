@@ -73,6 +73,7 @@ pub struct VirtualMachine {
     pub call_stack: Vec<usize>,
     pub repeat_counters: Vec<i64>,
     pub halted: bool,
+    pub marginalia: HashMap<usize, String>,
 }
 
 impl VirtualMachine {
@@ -88,6 +89,7 @@ impl VirtualMachine {
             call_stack: Vec::new(),
             repeat_counters: Vec::new(),
             halted: false,
+            marginalia: HashMap::new(),
         }
     }
 
@@ -98,6 +100,11 @@ impl VirtualMachine {
         self.call_stack.clear();
         self.repeat_counters.clear();
         self.halted = false;
+        self.marginalia.clear();
+    }
+
+    pub fn marginalia(&self) -> &HashMap<usize, String> {
+        &self.marginalia
     }
 
     pub fn step(&mut self, robot: &mut RobotField) -> StepResult {
@@ -134,6 +141,14 @@ impl VirtualMachine {
                 Instruction::RobotCmd(action, line) => {
                     self.current_line = line;
                     self.pc += 1;
+                    let action_name = match action {
+                        RobotAction::Vlevo => "влево",
+                        RobotAction::Vpravo => "вправо",
+                        RobotAction::Vverh => "вверх",
+                        RobotAction::Vniz => "вниз",
+                        RobotAction::Zakrasit => "закрасить",
+                    };
+                    self.marginalia.insert(line, action_name.to_string());
                     match action {
                         RobotAction::Vlevo => {
                             if let Err(e) = robot.move_robot(&Direction::Left) {
@@ -170,6 +185,7 @@ impl VirtualMachine {
                     self.pc += 1;
                     match self.eval_expr(&expr, robot) {
                         Ok(val) => {
+                            self.marginalia.insert(line, format!("{} = {}", var, val));
                             self.variables.insert(var, val);
                         }
                         Err(e) => {
@@ -194,6 +210,10 @@ impl VirtualMachine {
                             },
                         }
                     }
+                    let trimmed = out.trim();
+                    if !trimmed.is_empty() {
+                        self.marginalia.insert(line, format!("вывод: {}", trimmed));
+                    }
                     return StepResult::Output(out);
                 }
                 Instruction::Jump(target) => {
@@ -202,7 +222,9 @@ impl VirtualMachine {
                 Instruction::JumpIfFalse(cond, target) => {
                     match self.eval_expr(&cond, robot) {
                         Ok(val) => {
-                            if !val.is_truthy() {
+                            let is_true = val.is_truthy();
+                            self.marginalia.insert(self.current_line, (if is_true { "да" } else { "нет" }).to_string());
+                            if !is_true {
                                 self.pc = target;
                             } else {
                                 self.pc += 1;
@@ -245,6 +267,7 @@ impl VirtualMachine {
                         1
                     };
 
+                    self.marginalia.insert(self.current_line, format!("{} = {}", var, from_val));
                     self.variables.insert(var.clone(), Value::Int(from_val));
                     if (step_val > 0 && from_val > to_val) || (step_val < 0 && from_val < to_val) {
                         self.pc = jump_if_empty;
@@ -272,7 +295,8 @@ impl VirtualMachine {
 
                     let curr = self.variables.get(&var).and_then(|v| v.as_int().ok()).unwrap_or(0);
                     let next = curr + step_val;
-                    self.variables.insert(var, Value::Int(next));
+                    self.variables.insert(var.clone(), Value::Int(next));
+                    self.marginalia.insert(self.current_line, format!("{} = {}", var, next));
 
                     if (step_val > 0 && next <= to_val) || (step_val < 0 && next >= to_val) {
                         self.pc = loop_top;
@@ -289,6 +313,7 @@ impl VirtualMachine {
                             return StepResult::Error { line: self.current_line, message: e };
                         }
                     };
+                    self.marginalia.insert(self.current_line, format!("раз: {}", count));
                     if counter_idx >= self.repeat_counters.len() {
                         self.repeat_counters.resize(counter_idx + 1, 0);
                     }
@@ -300,7 +325,9 @@ impl VirtualMachine {
                 Instruction::RepeatNext { counter_idx, loop_top } => {
                     if counter_idx < self.repeat_counters.len() {
                         self.repeat_counters[counter_idx] -= 1;
-                        if self.repeat_counters[counter_idx] > 0 {
+                        let rem = self.repeat_counters[counter_idx];
+                        if rem > 0 {
+                            self.marginalia.insert(self.current_line, format!("шаг {}", rem));
                             self.pc = loop_top;
                             continue;
                         }

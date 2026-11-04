@@ -1,53 +1,53 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
     // Keywords
-    Alg,        // алг
-    Nach,       // нач
-    Kon,        // кон
-    Isp,        // исп / использовать
-    Cel,        // цел (integer)
-    Veshch,     // вещ (float)
-    Log,        // лог (boolean)
-    Sim,        // сим (char)
-    Lit,        // лит (string)
-    Esli,       // если
-    To,         // то
-    Inache,     // иначе
-    Vse,        // все
-    Nc,         // нц
-    Kc,         // кц
-    Poka,       // пока
-    Raz,        // раз
-    Dlya,       // для
-    Ot,         // от
-    Do,         // до
-    Shag,       // шаг
-    Vyvod,      // вывод
-    Vvod,       // ввод
-    Ns,         // нс (новая строка)
-    I,          // и (and)
-    Ili,        // или (or)
-    Ne,         // не (not)
-    Da,         // да (true)
-    Net,        // нет (false)
-    Div,        // div
-    Mod,        // mod
+    Alg,        // alg / algorithm declaration
+    Nach,       // begin / algorithm body start
+    Kon,        // end / algorithm body finish
+    Isp,        // use / import module
+    Cel,        // integer type
+    Veshch,     // float / real type
+    Log,        // boolean type
+    Sim,        // char type
+    Lit,        // string type
+    Esli,       // if statement
+    To,         // then branch
+    Inache,     // else branch
+    Vse,        // fi / end of if block
+    Nc,         // loop start (begin cycle)
+    Kc,         // loop end (end cycle)
+    Poka,       // while loop condition
+    Raz,        // times (loop repetition count)
+    Dlya,       // for loop
+    Ot,         // from (range start)
+    Do,         // to (range end)
+    Shag,       // step (range increment)
+    Vyvod,      // output / print
+    Vvod,       // input / read
+    Ns,         // newline
+    I,          // logical and
+    Ili,        // logical or
+    Ne,         // logical not
+    Da,         // true literal
+    Net,        // false literal
+    Div,        // integer division
+    Mod,        // modulo remainder
 
-    // Robot specific
-    Vlevo,      // влево
-    Vpravo,     // вправо
-    Vverh,      // вверх
-    Vniz,       // вниз
-    Zakrasit,   // закрасить
-    Sleva,      // слева
-    Sprava,     // справа
-    Sverhu,     // сверху
-    Snizu,      // снизу
-    Svobodno,   // свободно
-    Stena,      // стена
-    Kletka,     // клетка
-    Zakrashena, // закрашена
-    Chistaya,   // чистая
+    // Robot performer commands & sensors
+    Vlevo,      // move left
+    Vpravo,     // move right
+    Vverh,      // move up
+    Vniz,       // move down
+    Zakrasit,   // paint current cell
+    Sleva,      // at left sensor
+    Sprava,     // at right sensor
+    Sverhu,     // at top sensor
+    Snizu,      // at bottom sensor
+    Svobodno,   // free path sensor
+    Stena,      // wall obstacle sensor
+    Kletka,     // cell
+    Zakrashena, // painted cell sensor
+    Chistaya,   // clean cell sensor
 
     // Literals and Identifiers
     Ident(String),
@@ -154,7 +154,7 @@ impl<'a> Lexer<'a> {
 
             // KuMir comments: '|' or '//'
             if ch == '|' || (ch == '/' && self.peek_next() == Some('/')) {
-                // skip to end of line
+                // Skip until end of line
                 while let Some(c) = self.peek() {
                     self.advance();
                     if c == '\n' {
@@ -164,19 +164,19 @@ impl<'a> Lexer<'a> {
                 continue;
             }
 
-            // Number
+            // Number literal
             if ch.is_ascii_digit() {
                 tokens.push(self.read_number(line, col)?);
                 continue;
             }
 
-            // String
+            // String literal
             if ch == '"' || ch == '\'' {
                 tokens.push(self.read_string(ch, line, col)?);
                 continue;
             }
 
-            // Two-char operators
+            // Two-character operators
             if ch == ':' && self.peek_next() == Some('=') {
                 self.advance();
                 self.advance();
@@ -202,7 +202,7 @@ impl<'a> Lexer<'a> {
                 continue;
             }
 
-            // Single char symbols
+            // Single-character symbols and operators
             match ch {
                 '=' => { self.advance(); tokens.push(Token { kind: TokenKind::Equal, line, col }); }
                 '<' => { self.advance(); tokens.push(Token { kind: TokenKind::Less, line, col }); }
@@ -221,7 +221,7 @@ impl<'a> Lexer<'a> {
                 }
                 _ => {
                     self.advance();
-                    // Unknown symbol, skip or return error
+                    // Unknown symbol, skip silently
                 }
             }
         }
@@ -249,10 +249,10 @@ impl<'a> Lexer<'a> {
         }
 
         if is_float {
-            let val = s.parse::<f64>().map_err(|e| format!("Некорректное вещественное число '{}': {}", s, e))?;
+            let val = s.parse::<f64>().map_err(|e| format!("Invalid float number '{}': {}", s, e))?;
             Ok(Token { kind: TokenKind::FloatNumber(val), line, col })
         } else {
-            let val = s.parse::<i64>().map_err(|e| format!("Некорректное целое число '{}': {}", s, e))?;
+            let val = s.parse::<i64>().map_err(|e| format!("Invalid integer number '{}': {}", s, e))?;
             Ok(Token { kind: TokenKind::IntNumber(val), line, col })
         }
     }
@@ -266,14 +266,14 @@ impl<'a> Lexer<'a> {
                 self.advance(); // consume close quote
                 return Ok(Token { kind: TokenKind::StringLit(s), line, col });
             } else if c == '\n' {
-                return Err(format!("Незакрытая строка на строке {}", line));
+                return Err(format!("Unterminated string literal on line {}", line));
             } else {
                 s.push(c);
                 self.advance();
             }
         }
 
-        Err(format!("Незакрытая строка в конце файла на строке {}", line))
+        Err(format!("Unterminated string literal at EOF on line {}", line))
     }
 
     fn read_ident_or_keyword(&mut self, line: usize, col: usize) -> Token {
@@ -322,7 +322,7 @@ impl<'a> Lexer<'a> {
             "div" => TokenKind::Div,
             "mod" => TokenKind::Mod,
 
-            // Robot
+            // Robot performer keywords
             "влево" | "left" => TokenKind::Vlevo,
             "вправо" | "right" => TokenKind::Vpravo,
             "вверх" | "up" => TokenKind::Vverh,

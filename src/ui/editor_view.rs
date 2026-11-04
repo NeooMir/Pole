@@ -33,6 +33,9 @@ pub struct EditorView {
     pub buffer: gtk::TextBuffer,
     pub line_numbers_view: gtk::TextView,
     pub line_numbers_buffer: gtk::TextBuffer,
+    pub marginalia_view: gtk::TextView,
+    pub marginalia_buffer: gtk::TextBuffer,
+    marginalia_tag: gtk::TextTag,
     pub vim: Rc<VimController>,
     pub current_theme: Rc<RefCell<ThemeId>>,
     css_provider: gtk::CssProvider,
@@ -143,9 +146,39 @@ impl EditorView {
         let vadj = scrolled_editor.vadjustment();
         scrolled_gutter.set_vadjustment(Some(&vadj));
 
+        // Marginalia (Right gutter for real-time live variable & expression values)
+        let marginalia_buffer = gtk::TextBuffer::new(None::<&gtk::TextTagTable>);
+        let marginalia_tag = marginalia_buffer.create_tag(Some("marginalia_val"), &[
+            ("foreground", &initial_theme.comment_color()),
+            ("style", &pango::Style::Italic),
+        ]).unwrap();
+
+        let marginalia_view = gtk::TextView::with_buffer(&marginalia_buffer);
+        marginalia_view.set_monospace(true);
+        marginalia_view.set_editable(false);
+        marginalia_view.set_cursor_visible(false);
+        marginalia_view.set_can_focus(false);
+        marginalia_view.set_left_margin(10);
+        marginalia_view.set_right_margin(10);
+        marginalia_view.set_top_margin(6);
+        marginalia_view.set_bottom_margin(6);
+        marginalia_view.set_wrap_mode(gtk::WrapMode::None);
+        marginalia_view.add_css_class("neomir-marginalia");
+
+        let scrolled_marginalia = gtk::ScrolledWindow::new();
+        scrolled_marginalia.set_child(Some(&marginalia_view));
+        scrolled_marginalia.set_vexpand(true);
+        scrolled_marginalia.set_hexpand(false);
+        scrolled_marginalia.set_size_request(140, -1);
+        scrolled_marginalia.set_hscrollbar_policy(gtk::PolicyType::Never);
+        scrolled_marginalia.set_vscrollbar_policy(gtk::PolicyType::Never);
+        scrolled_marginalia.set_vadjustment(Some(&vadj));
+
         editor_row.append(&scrolled_gutter);
         editor_row.append(&gtk::Separator::new(gtk::Orientation::Vertical));
         editor_row.append(&scrolled_editor);
+        editor_row.append(&gtk::Separator::new(gtk::Orientation::Vertical));
+        editor_row.append(&scrolled_marginalia);
 
         container.append(&editor_row);
 
@@ -182,6 +215,9 @@ impl EditorView {
             buffer,
             line_numbers_view,
             line_numbers_buffer,
+            marginalia_view,
+            marginalia_buffer,
+            marginalia_tag,
             vim,
             current_theme,
             css_provider,
@@ -220,6 +256,7 @@ impl EditorView {
         self.tag_current_line.set_property("background", theme.current_line_bg());
         self.tag_current_line.set_property("foreground", theme.current_line_fg());
         self.line_tag.set_property("foreground", theme.gutter_fg());
+        self.marginalia_tag.set_property("foreground", theme.comment_color());
 
         // Re-highlight syntax
         Self::highlight_syntax(
@@ -256,6 +293,7 @@ impl EditorView {
 
     fn setup_signals(&self, line_tag: gtk::TextTag) {
         let gutter_buf = self.line_numbers_buffer.clone();
+        let marg_buf = self.marginalia_buffer.clone();
         let kw_tag = self.tag_keyword.clone();
         let rb_tag = self.tag_robot.clone();
         let sn_tag = self.tag_sensor.clone();
@@ -275,6 +313,13 @@ impl EditorView {
             let start = gutter_buf.start_iter();
             let end = gutter_buf.end_iter();
             gutter_buf.apply_tag(&line_tag, &start, &end);
+
+            // Keep marginalia buffer lines aligned with editor line count
+            let mut blank_marg = String::new();
+            for _ in 1..=line_count {
+                blank_marg.push('\n');
+            }
+            marg_buf.set_text(&blank_marg);
 
             // Re-apply syntax highlighting
             let mode = *syn_mode.borrow();
@@ -460,6 +505,32 @@ impl EditorView {
     pub fn set_text(&self, text: &str) {
         self.buffer.set_text(text);
         self.update_gutter();
+        self.clear_marginalia();
+    }
+
+    pub fn update_marginalia(&self, map: &std::collections::HashMap<usize, String>) {
+        let line_count = self.buffer.line_count().max(1);
+        let mut out = String::new();
+        for i in 1..=line_count {
+            let line_idx = i as usize;
+            if let Some(val) = map.get(&line_idx) {
+                out.push_str(val);
+            }
+            out.push('\n');
+        }
+        self.marginalia_buffer.set_text(&out);
+        let start = self.marginalia_buffer.start_iter();
+        let end = self.marginalia_buffer.end_iter();
+        self.marginalia_buffer.apply_tag(&self.marginalia_tag, &start, &end);
+    }
+
+    pub fn clear_marginalia(&self) {
+        let line_count = self.buffer.line_count().max(1);
+        let mut out = String::new();
+        for _ in 1..=line_count {
+            out.push('\n');
+        }
+        self.marginalia_buffer.set_text(&out);
     }
 
     pub fn insert_at_cursor(&self, text: &str) {

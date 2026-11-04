@@ -1,0 +1,30 @@
+# Meson cross compilation definition for Windows x86_64 using Clang and LLVM
+
+[binaries]
+c = 'clang'
+cpp = 'clang++'
+rust = 'rustc'
+ar = 'llvm-ar'
+strip = 'llvm-strip'
+pkgconfig = 'pkg-config'
+
+[built-in options]
+c_args = ['--target=x86_64-w64-windows-gnu']
+cpp_args = ['--target=x86_64-w64-windows-gnu']
+c_link_args = ['--target=x86_64-w64-windows-gnu', '-fuse-ld=lld']
+cpp_link_args = ['--target=x86_64-w64-windows-gnu', '-fuse-ld=lld']
+rust_args = [
+    '--target=x86_64-pc-windows-gnu',
+    '-C', 'linker=clang',
+    '-C', 'link-arg=--target=x86_64-w64-windows-gnu',
+    '-C', 'link-arg=-fuse-ld=lld',
+]
+
+[properties]
+needs_exe_wrapper = true
+
+[host_machine]
+system = 'windows'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'

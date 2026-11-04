@@ -1,7 +1,7 @@
 project('pole',
   version: '1.3.0',
   meson_version: '>= 0.59.0',
-  license: 'GPL-2.0-or-later',
+  license: 'MIT',
 )
 
 i18n = import('i18n')
@@ -20,6 +20,7 @@ install_data('LICENSE', install_dir: datadir / 'licenses' / 'pole')
 
 subdir('data')
 subdir('src')
+subdir('python')
 
 gnome.post_install(
   glib_compile_schemas: false,
