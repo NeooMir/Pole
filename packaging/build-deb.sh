@@ -6,12 +6,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
 
-WORK_DIR="/tmp/neomir-deb-build"
-PACKAGE_NAME="neomir"
-VERSION="1.2"
+WORK_DIR="/tmp/pole-deb-build"
+PACKAGE_NAME="pole"
+VERSION="1.3.0"
 ARCH="amd64"
 
-echo "==> Building NeoMir release binary..."
+echo "==> Building Pole release binary..."
 cargo build --release --manifest-path "$ROOT_DIR/Cargo.toml"
 
 echo "==> Preparing DEB file structure..."
@@ -22,15 +22,15 @@ mkdir -p "$WORK_DIR/pkg/usr/share/applications"
 mkdir -p "$WORK_DIR/pkg/usr/share/metainfo"
 mkdir -p "$WORK_DIR/pkg/usr/share/icons/hicolor/scalable/apps"
 mkdir -p "$WORK_DIR/pkg/usr/share/icons/hicolor/symbolic/apps"
-mkdir -p "$WORK_DIR/pkg/usr/share/doc/neomir"
+mkdir -p "$WORK_DIR/pkg/usr/share/doc/pole"
 mkdir -p "$DIST_DIR"
 
-install -m 755 "$ROOT_DIR/target/release/neomir" "$WORK_DIR/pkg/usr/bin/neomir"
-install -m 644 "$ROOT_DIR/data/io.github.neomir.app.desktop.in" "$WORK_DIR/pkg/usr/share/applications/io.github.neomir.app.desktop"
-install -m 644 "$ROOT_DIR/data/io.github.neomir.app.metainfo.xml.in" "$WORK_DIR/pkg/usr/share/metainfo/io.github.neomir.app.metainfo.xml"
-install -m 644 "$ROOT_DIR/data/icons/hicolor/scalable/apps/io.github.neomir.app.svg" "$WORK_DIR/pkg/usr/share/icons/hicolor/scalable/apps/"
-install -m 644 "$ROOT_DIR/data/icons/hicolor/symbolic/apps/io.github.neomir.app-symbolic.svg" "$WORK_DIR/pkg/usr/share/icons/hicolor/symbolic/apps/"
-install -m 644 "$ROOT_DIR/LICENSE" "$WORK_DIR/pkg/usr/share/doc/neomir/copyright"
+install -m 755 "$ROOT_DIR/target/release/pole" "$WORK_DIR/pkg/usr/bin/pole"
+install -m 644 "$ROOT_DIR/data/io.github.NeooMir.Pole.desktop.in" "$WORK_DIR/pkg/usr/share/applications/io.github.NeooMir.Pole.desktop"
+install -m 644 "$ROOT_DIR/data/io.github.NeooMir.Pole.metainfo.xml.in" "$WORK_DIR/pkg/usr/share/metainfo/io.github.NeooMir.Pole.metainfo.xml"
+install -m 644 "$ROOT_DIR/data/icons/hicolor/scalable/apps/io.github.NeooMir.Pole.svg" "$WORK_DIR/pkg/usr/share/icons/hicolor/scalable/apps/"
+install -m 644 "$ROOT_DIR/data/icons/hicolor/symbolic/apps/io.github.NeooMir.Pole-symbolic.svg" "$WORK_DIR/pkg/usr/share/icons/hicolor/symbolic/apps/"
+install -m 644 "$ROOT_DIR/LICENSE" "$WORK_DIR/pkg/usr/share/doc/pole/copyright"
 
 # Calculate size in KB
 INSTALLED_SIZE=$(du -sk "$WORK_DIR/pkg/usr" | cut -f1)
@@ -42,11 +42,11 @@ Section: education
 Priority: optional
 Architecture: ${ARCH}
 Installed-Size: ${INSTALLED_SIZE}
-Maintainer: NeoMir Contributors <https://github.com/vptr/neomir>
+Maintainer: NeoMir Team <https://github.com/NeooMir/Pole>
 Depends: libc6 (>= 2.34), libgtk-4-1 (>= 4.10), libadwaita-1-0 (>= 1.5)
-Homepage: https://github.com/vptr/neomir
+Homepage: https://github.com/NeooMir/Pole
 Description: Educational programming environment for KuMir with Robot performer
- NeoMir is a modern KuMir-compatible educational IDE written in Rust with GTK4 and Libadwaita.
+ Pole (NeoMir) is a modern KuMir-compatible educational IDE written in Rust with GTK4 and Libadwaita.
 EOF
 
 echo "==> Packaging DEB..."
