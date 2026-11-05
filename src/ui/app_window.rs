@@ -11,6 +11,7 @@ use crate::ui::settings_dialog::{AppSettings, SettingsDialog};
 use crate::ui::theme::ThemeId;
 use crate::ui::blocks_view::BlocksView;
 use crate::ui::docs_window::DocsWindow;
+use crate::ui::welcome_view::{ProjectType, WelcomeView};
 use adw::prelude::*;
 use gtk::{gdk, glib};
 use std::cell::RefCell;
@@ -47,6 +48,12 @@ impl AppWindow {
         let blocks_view = Rc::new(BlocksView::new(current_lang));
         let field_view = Rc::new(RobotFieldView::new(field.clone()));
         let console_view = Rc::new(ConsoleView::new(current_lang));
+
+        let welcome_view = Rc::new(WelcomeView::new(current_lang));
+        let main_stack = gtk::Stack::new();
+        main_stack.set_transition_type(gtk::StackTransitionType::Crossfade);
+        main_stack.set_transition_duration(150);
+        main_stack.add_named(&welcome_view.container, Some("welcome"));
 
         // Sync blocks changes to editor buffer
         {
@@ -105,6 +112,10 @@ impl AppWindow {
         );
 
         // Top HeaderBar Buttons: Primary Execution Only
+        let btn_home = gtk::Button::from_icon_name("go-home-symbolic");
+        btn_home.set_tooltip_text(Some(current_lang.tr("tip_home")));
+        btn_home.add_css_class("flat");
+
         let btn_run = gtk::Button::new();
         Self::set_btn_content(&btn_run, "media-playback-start-symbolic", current_lang.tr("run"));
         btn_run.add_css_class("suggested-action");
@@ -190,6 +201,11 @@ impl AppWindow {
         menu_box.set_margin_end(6);
 
         // Section 1: File Operations
+        let btn_menu_home = gtk::Button::new();
+        Self::set_btn_content(&btn_menu_home, "document-new-symbolic", current_lang.tr("menu_new_project"));
+        btn_menu_home.add_css_class("flat");
+        menu_box.append(&btn_menu_home);
+
         let btn_menu_load = gtk::Button::new();
         Self::set_btn_content(&btn_menu_load, "document-open-symbolic", current_lang.tr("menu_load"));
         btn_menu_load.add_css_class("flat");
@@ -350,6 +366,9 @@ impl AppWindow {
             let b_m_text = btn_mode_text.clone();
             let b_m_blocks = btn_mode_blocks.clone();
             let bv_lang = blocks_view.clone();
+            let b_home = btn_home.clone();
+            let b_m_home = btn_menu_home.clone();
+            let wv_lang = welcome_view.clone();
 
             Rc::new(move || {
                 let lang = *lr.borrow();
@@ -386,6 +405,9 @@ impl AppWindow {
                 b_m_text.set_label(lang.tr("mode_text"));
                 b_m_blocks.set_label(lang.tr("mode_blocks"));
                 bv_lang.set_language(lang);
+                b_home.set_tooltip_text(Some(lang.tr("tip_home")));
+                Self::set_btn_content(&b_m_home, "document-new-symbolic", lang.tr("menu_new_project"));
+                wv_lang.update_language(lang);
                 ut();
                 sync();
             })
@@ -479,6 +501,9 @@ impl AppWindow {
             let st = app_settings.clone();
             let b_m_syn = btn_menu_syntax.clone();
             let bv_clone = blocks_view.clone();
+            let wv_load = welcome_view.clone();
+            let m_stack_load = main_stack.clone();
+            let tw_load = title_widget.clone();
             Rc::new(move || {
                 let lang = *lr.borrow();
                 let dialog = gtk::FileChooserNative::new(
@@ -509,6 +534,9 @@ impl AppWindow {
                 let st_clone = st.clone();
                 let b_syn_clone = b_m_syn.clone();
                 let bv_inner = bv_clone.clone();
+                let wv_inner = wv_load.clone();
+                let m_stack_inner = m_stack_load.clone();
+                let tw_inner = tw_load.clone();
 
                 dialog.connect_response(move |d, response| {
                     if response == gtk::ResponseType::Accept {
@@ -536,6 +564,11 @@ impl AppWindow {
                                             }
                                         }
 
+                                        let fname = path.file_name().and_then(|n| n.to_str()).unwrap_or("Algorithm");
+                                        tw_inner.set_title(&format!("Pole — {}", fname));
+                                        wv_inner.set_has_active_workspace(true);
+                                        m_stack_inner.set_visible_child_name("workspace");
+
                                         let msg = l.tr("file_loaded").replace("{}", &path.display().to_string());
                                         con_clone.print_info(&msg);
                                     }
@@ -558,6 +591,7 @@ impl AppWindow {
             let ev = editor_view.clone();
             let con = console_view.clone();
             let lr = lang_ref.clone();
+            let tw_save = title_widget.clone();
             Rc::new(move || {
                 let lang = *lr.borrow();
                 let dialog = gtk::FileChooserNative::new(
@@ -585,6 +619,7 @@ impl AppWindow {
                 let ev_clone = ev.clone();
                 let con_clone = con.clone();
                 let lr_clone = lr.clone();
+                let tw_inner = tw_save.clone();
                 dialog.connect_response(move |d, response| {
                     if response == gtk::ResponseType::Accept {
                         if let Some(file) = d.file() {
@@ -595,6 +630,8 @@ impl AppWindow {
                                 let text = ev_clone.buffer.text(&start, &end, false);
                                 match std::fs::write(&path, text.as_str()) {
                                     Ok(_) => {
+                                        let fname = path.file_name().and_then(|n| n.to_str()).unwrap_or("Algorithm");
+                                        tw_inner.set_title(&format!("Pole — {}", fname));
                                         let msg = l.tr("file_saved").replace("{}", &path.display().to_string());
                                         con_clone.print_success(&msg);
                                     }
@@ -767,6 +804,7 @@ impl AppWindow {
         header.set_title_widget(Some(&title_widget));
 
         let left_controls = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        left_controls.append(&btn_home);
         left_controls.append(&btn_run);
         left_controls.append(&btn_step);
         header.pack_start(&left_controls);
@@ -932,7 +970,139 @@ impl AppWindow {
         root_box.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
         root_box.append(&status_box);
 
-        window.set_content(Some(&root_box));
+        main_stack.add_named(&root_box, Some("workspace"));
+        main_stack.set_visible_child_name("welcome");
+
+        window.set_content(Some(&main_stack));
+
+        // Project Creation Logic from Welcome Screen
+        let apply_project_fn = {
+            let ev = editor_view.clone();
+            let b_syn = btn_menu_syntax.clone();
+            let lr = lang_ref.clone();
+            let st = app_settings.clone();
+            let tw = title_widget.clone();
+            let stat = status_label.clone();
+            let con = console_view.clone();
+            let m_stack = main_stack.clone();
+            let wv = welcome_view.clone();
+            let b_perf_robot = btn_performer_robot.clone();
+            let b_perf_turtle = btn_performer_turtle.clone();
+            let do_reset = do_reset_fn.clone();
+
+            Rc::new(move |proj_type: ProjectType, name: String| {
+                let lang = *lr.borrow();
+                let full_title = format!("Pole — {}.{}", name, proj_type.file_extension());
+                tw.set_title(&full_title);
+
+                match proj_type {
+                    ProjectType::KumirRobot => {
+                        b_perf_robot.set_active(true);
+                        ev.set_syntax_mode(SyntaxMode::Kumir);
+                        st.borrow_mut().syntax_mode = "kumir".to_string();
+                        let _ = st.borrow().save();
+                        Self::set_btn_content(&b_syn, "format-text-code-symbolic", lang.tr("syntax_kumir"));
+                        ev.buffer.set_text(proj_type.starter_code());
+                        ev.update_gutter();
+                        ev.rehighlight();
+                    }
+                    ProjectType::PythonRobot => {
+                        b_perf_robot.set_active(true);
+                        ev.set_syntax_mode(SyntaxMode::Python);
+                        st.borrow_mut().syntax_mode = "python".to_string();
+                        let _ = st.borrow().save();
+                        Self::set_btn_content(&b_syn, "format-text-code-symbolic", lang.tr("syntax_python"));
+                        ev.buffer.set_text(proj_type.starter_code());
+                        ev.update_gutter();
+                        ev.rehighlight();
+                    }
+                    ProjectType::PythonTurtle => {
+                        b_perf_turtle.set_active(true);
+                        ev.set_syntax_mode(SyntaxMode::Python);
+                        st.borrow_mut().syntax_mode = "python".to_string();
+                        let _ = st.borrow().save();
+                        Self::set_btn_content(&b_syn, "format-text-code-symbolic", lang.tr("syntax_python"));
+                        ev.buffer.set_text(proj_type.starter_code());
+                        ev.update_gutter();
+                        ev.rehighlight();
+                    }
+                }
+
+                do_reset();
+                wv.set_has_active_workspace(true);
+                m_stack.set_visible_child_name("workspace");
+
+                let notice = if lang.is_en() {
+                    format!("Created project '{}.{}'", name, proj_type.file_extension())
+                } else {
+                    format!("Создан проект '{}.{}'", name, proj_type.file_extension())
+                };
+                stat.set_text(&notice);
+                con.print_info(&notice);
+            })
+        };
+
+        {
+            let apply = apply_project_fn.clone();
+            let wv = welcome_view.clone();
+            welcome_view.btn_create.connect_clicked(move |_| {
+                apply(wv.selected_project_type(), wv.project_name());
+            });
+        }
+        {
+            let apply = apply_project_fn.clone();
+            let wv = welcome_view.clone();
+            welcome_view.name_entry.connect_entry_activated(move |_| {
+                apply(wv.selected_project_type(), wv.project_name());
+            });
+        }
+        {
+            let apply = apply_project_fn.clone();
+            let wv = welcome_view.clone();
+            welcome_view.row_quick_kumir.connect_activated(move |_| {
+                apply(ProjectType::KumirRobot, wv.project_name());
+            });
+        }
+        {
+            let apply = apply_project_fn.clone();
+            let wv = welcome_view.clone();
+            welcome_view.row_quick_py_robot.connect_activated(move |_| {
+                apply(ProjectType::PythonRobot, wv.project_name());
+            });
+        }
+        {
+            let apply = apply_project_fn.clone();
+            let wv = welcome_view.clone();
+            welcome_view.row_quick_py_turtle.connect_activated(move |_| {
+                apply(ProjectType::PythonTurtle, wv.project_name());
+            });
+        }
+        {
+            let load_fn = do_load_fn.clone();
+            welcome_view.btn_open.connect_clicked(move |_| {
+                load_fn();
+            });
+        }
+        {
+            let m_stack = main_stack.clone();
+            welcome_view.btn_back.connect_clicked(move |_| {
+                m_stack.set_visible_child_name("workspace");
+            });
+        }
+        {
+            let m_stack = main_stack.clone();
+            btn_home.connect_clicked(move |_| {
+                m_stack.set_visible_child_name("welcome");
+            });
+        }
+        {
+            let m_stack = main_stack.clone();
+            let pop = menu_popover.clone();
+            btn_menu_home.connect_clicked(move |_| {
+                pop.popdown();
+                m_stack.set_visible_child_name("welcome");
+            });
+        }
 
         // Performer switcher: Robot ↔ Turtle
         // Only wired if turtle plugin is available - otherwise btn_performer_robot/turtle

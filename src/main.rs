@@ -573,4 +573,28 @@ mod tests {
         assert!(wrapped.contains("from pole import robot"), "Wrapped script must import pole");
         assert!(wrapped.contains("print('Hello from embedded Python')"));
     }
+
+    #[test]
+    fn test_welcome_project_types() {
+        use crate::ui::i18n::Language;
+        use crate::ui::welcome_view::ProjectType;
+
+        let types = ProjectType::all();
+        assert_eq!(types.len(), 3);
+
+        for pt in types {
+            assert!(!pt.title(Language::En).is_empty());
+            assert!(!pt.title(Language::Ru).is_empty());
+            assert!(!pt.subtitle(Language::En).is_empty());
+            assert!(!pt.subtitle(Language::Ru).is_empty());
+            assert!(!pt.default_project_name(Language::En).is_empty());
+            assert!(!pt.default_project_name(Language::Ru).is_empty());
+            assert!(!pt.file_extension().is_empty());
+            assert!(!pt.starter_code().is_empty());
+        }
+
+        assert_eq!(ProjectType::KumirRobot.file_extension(), "kum");
+        assert_eq!(ProjectType::PythonRobot.file_extension(), "py");
+        assert_eq!(ProjectType::PythonTurtle.file_extension(), "py");
+    }
 }
