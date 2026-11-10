@@ -6,6 +6,7 @@ project('pole',
 
 i18n = import('i18n')
 gnome = import('gnome')
+fs = import('fs')
 
 base_id = 'io.github.NeooMir.Pole'
 datadir = get_option('prefix') / get_option('datadir')
@@ -20,7 +21,9 @@ install_data('LICENSE', install_dir: datadir / 'licenses' / 'pole')
 
 subdir('data')
 subdir('src')
-subdir('python')
+if fs.is_dir('python')
+  subdir('python')
+endif
 
 gnome.post_install(
   glib_compile_schemas: false,
